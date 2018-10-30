@@ -1,3 +1,9 @@
+# file              /BootLoader/BootLoader.asm
+# date              2018.10.30
+# last edit date    2018.10.30
+# author            NO.00[UNKNOWN]
+# breif             Bootloader source code file
+
 [ORG 0x00]          ; CODE START ADDRESS: 0x00
 [BITS 16]           ; 16bit CODE
 

@@ -1,3 +1,9 @@
+# file              /BootLoader/makefile
+# date              2018.10.29
+# last edit date    2018.10.29
+# author            NO.00[UNKNOWN]
+# breif             Bootloader makefile
+
 all: BootLoader.bin
 
 BootLoader.bin: BootLoader.asm
