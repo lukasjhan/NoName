@@ -9,7 +9,7 @@ BootLoader:
 	@echo ++++++++++++++++++++ Building Boot Loader COMPLETE!!! ++++++++++++++++++++
 	@echo
 
-Disk.img: BootLoader/BootLoader.Building
+Disk.img: BootLoader/BootLoader.bin
 	@echo
 	@echo ++++++++++++++++++++ OS image Building START!!! ++++++++++++++++++++
 
