@@ -47,7 +47,6 @@ START:
 
 .MESSAGEEND:
     jmp $               ; infinite loop
-                        ; TODO: BOOTSECTOR CODE will be added here!
 
 MESSAGE1:      db 'BOOT START!!', 0     ; message defined
                                         ; last bit is 0 to identify its end
