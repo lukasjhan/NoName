@@ -1,6 +1,6 @@
-#BIOS color attributes
+# BIOS color attributes
 
-##Colors
+## Colors
 
 * 0x00 : BLACK
 * 0x01 : BLUE
