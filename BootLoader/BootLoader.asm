@@ -7,7 +7,7 @@
 [ORG 0x00]          ; CODE START ADDRESS: 0x00
 [BITS 16]           ; 16bit CODE
 
-SECTION .text       ; text segment define
+SECTION .text       ; define text segment
 
 jmp 0x07C0:START    ; copy 0x07C0 to CS segment register, move START lable
 
