@@ -21,7 +21,7 @@ START:
 
 .SCREENCLEARLOOP:                   ; loop for clear screen
     mov byte [ es: si ], 0          ; copy 0 to video memory text address to remove text
-    mov byte [ es: si + 1], 0x00    ; copy 0x00:white to video memory property address to set text color
+    mov byte [ es: si + 1], 0x0F    ; copy 0x0F:white to video memory property address to set text color
 
     add si, 2                       ; move to next position
 
@@ -32,9 +32,25 @@ START:
     mov si, 0                       ; initialize si register
     mov di, 0                       ; initialize di register
 
+.MESSAGELOOP:                       ; loop for print messages
+    mov cl, byte [ si + MESSAGE1]   ; copy address of MESSAGE1 + si register to cl register
 
-jmp $               ; infinite loop
-                    ; TODO: BOOTSECTOR CODE will be added here!
+    cmp cl, 0                       ; compare cl register with 0
+    je .MESSAGEEND                  ; if 0, message printing end
+
+    mov byte [ es: di ], cl         ; if not 0, print message to 0xB800:di
+
+    add si, 1                       ; move to next text of message
+    add di, 2                       ; move to next address of video memory
+
+    jmp .MESSAGELOOP                ; keep print messages
+
+.MESSAGEEND:
+    jmp $               ; infinite loop
+                        ; TODO: BOOTSECTOR CODE will be added here!
+
+MESSAGE1:      db 'BOOT START!!', 0    ; message defined
+                                        ; last bit is 0 to identify its end
 
 times 510 - ( $ - $$ )    db    0x00    ; $: address in current line
                                         ; $$: current section address(.text)
