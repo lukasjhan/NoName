@@ -19,5 +19,5 @@
 * 0x0E : YELLOW
 * 0x0F : WHITE
 
-16 text color
-8 background color
+16 text colors
+8 background colors
