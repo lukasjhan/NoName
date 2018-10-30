@@ -9,6 +9,30 @@
 
 SECTION .text       ; text segment define
 
+jmp 0x07C0:START    ; copy 0x07C0 to CS segment register, move START lable
+
+START:
+    mov ax, 0x07C0  ; move start address:0x07C0 to segment register
+    mov ds, ax      ; set DS segment register
+    mov ax, 0xB800  ; move start address of video memory:0xB800 to segment register
+    mov es, ax      ; set ES segment register
+
+    mov si,     0   ; initialize SI register
+
+.SCREENCLEARLOOP:                   ; loop for clear screen
+    mov byte [ es: si ], 0          ; copy 0 to video memory text address to remove text
+    mov byte [ es: si + 1], 0x00    ; copy 0x00:white to video memory property address to set text color
+
+    add si, 2                       ; move to next position
+
+    cmp si, 80 * 25 * 2             ; compare si register with screen size:80*25
+
+    jl .SCREENCLEARLOOP             ; if less, jmp .SCREENCLEARLOOP
+
+    mov si, 0                       ; initialize si register
+    mov di, 0                       ; initialize di register
+
+
 jmp $               ; infinite loop
                     ; TODO: BOOTSECTOR CODE will be added here!
 
