@@ -58,7 +58,7 @@ times 510 - ( $ - $$ )    db    0x00    ; $: address in current line
                                         ; 510 - ( $ - $$ ): current address to address 510
                                         ; db 0x00: declare 1byte 0x00
                                         ; time: loop
-                                        ; current address to address 510 will fill with 0x00
+                                        ; current address to address 510(unused memory) will fill with 0x00
 
 db 0x55             ; declare 1byte with 0x55
 db 0xAA             ; declare 1byte with 0xAA
