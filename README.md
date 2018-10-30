@@ -18,8 +18,8 @@ At the top of the source code file, it must contain
 
 ## Example
 
->file              /BootLoader/BootLoader.asm  
->date              2018.10.30  
->last edit date    2018.10.30  
->author            NO.00[UNKNOWN]  
->brief             Bootloader source code file  
+filename          /BootLoader/BootLoader.asm  
+date              2018.10.30  
+last edit date    2018.10.30  
+author            NO.00[UNKNOWN]  
+brief             Bootloader source code file  
