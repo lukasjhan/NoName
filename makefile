@@ -1,8 +1,8 @@
-# file              /makefile
+# filename              /makefile
 # date              2018.10.29
 # last edit date    2018.10.30
 # author            NO.00[UNKNOWN]
-# breif             global makefile
+# brief             global makefile
 
 all: BootLoader Disk.img
 

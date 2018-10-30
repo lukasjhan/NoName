@@ -1,8 +1,8 @@
-# file              /BootLoader/makefile
+# filename          /BootLoader/makefile
 # date              2018.10.29
 # last edit date    2018.10.29
 # author            NO.00[UNKNOWN]
-# breif             Bootloader makefile
+# brief             Bootloader makefile
 
 all: BootLoader.bin
 
