@@ -21,7 +21,7 @@ START:
 
 .SCREENCLEARLOOP:                   ; loop for clear screen
     mov byte [ es: si ], 0          ; copy 0 to video memory text address to remove text
-    mov byte [ es: si + 1], 0x0F    ; copy 0x0F:white to video memory property address to set text color
+    mov byte [ es: si + 1], 0x0F    ; copy 0x0F:white to video memory property address to set text color (All color value is in README.md)
 
     add si, 2                       ; move to next position
 
