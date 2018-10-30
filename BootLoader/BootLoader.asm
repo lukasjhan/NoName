@@ -49,7 +49,7 @@ START:
     jmp $               ; infinite loop
                         ; TODO: BOOTSECTOR CODE will be added here!
 
-MESSAGE1:      db 'BOOT START!!', 0    ; message defined
+MESSAGE1:      db 'BOOT START!!', 0     ; message defined
                                         ; last bit is 0 to identify its end
 
 times 510 - ( $ - $$ )    db    0x00    ; $: address in current line
