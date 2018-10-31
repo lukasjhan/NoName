@@ -11,11 +11,19 @@ SECTION .text       ; define text segment
 
 jmp 0x07C0:START    ; copy 0x07C0 to CS segment register, move START lable
 
+
+;   CODE
 START:
     mov ax, 0x07C0  ; move start address:0x07C0 to segment register
     mov ds, ax      ; set DS segment register
     mov ax, 0xB800  ; move start address of video memory:0xB800 to segment register
     mov es, ax      ; set ES segment register
+
+    ;   STACK will set at 0x0000:0000~0x0000:FFFF (64KB)
+    mov ax, 0x0000  ; segment register fill with starting address of stack segment value
+    mov ss, ax      ; set SS segment register
+    mov sp, 0xFFFE  ; 0xFFFE set SP register
+    mov bp, 0xFFFE  ; 0xFFFE set BP register
 
     mov si,     0   ; initialize SI register
 
