@@ -4,7 +4,8 @@ Micro OS for small system.
 
 # Directory Description
 
-* /BootLoader : BootLoader for OS
+* /BootLoader : BootLoader for OS - Protopyte Complete
+* /Kernel32   : Working
 
 # Source Code File Templete
 
