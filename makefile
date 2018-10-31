@@ -8,22 +8,32 @@ all: BootLoader Disk.img
 
 BootLoader:
 	@echo 
-	@echo ++++++++++++++++++++ Building Boot Loader STRAT!!! ++++++++++++++++++++
+	@echo Building Boot Loader STRAT!!!
 
 	make -C BootLoader
 
-	@echo ++++++++++++++++++++ Building Boot Loader COMPLETE!!! ++++++++++++++++++++
+	@echo Building Boot Loader COMPLETE!!!
 	@echo
 
-Disk.img: BootLoader/BootLoader.bin
+Kernel32:
+	@echo 
+	@echo Building 32bit Kernel STRAT!!!
+
+	make -C Kernel32
+
+	@echo Building 32bit Kernel COMPLETE!!!
 	@echo
-	@echo ++++++++++++++++++++ OS image Building START!!! ++++++++++++++++++++
 
-	cp BootLoader/BootLoader.bin Disk.img
+Disk.img: BootLoader Kernel32
+	@echo
+	@echo OS image Building START!!!
 
-	@echo ++++++++++++++++++++ OS image Building COMPLETE!!! ++++++++++++++++++++
+	cat BootLoader/BootLoader.bin Kernel32/testOS.bin > Disk.img
+
+	@echo OS image Building COMPLETE!!!
 
 
 clean:
 	make -C BootLoader clean
+	make -C Kernel32 clean
 	rm -f Disk.img
