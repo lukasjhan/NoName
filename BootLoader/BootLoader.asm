@@ -31,7 +31,7 @@ START:
 
     mov si,     0   ; initialize SI register
 
-SCREENCLEARLOOP:                   ; loop for clear screen
+.SCREENCLEARLOOP:                   ; loop for clear screen
     mov byte [ es: si ], 0          ; copy 0 to video memory text address to remove text
     mov byte [ es: si + 1], 0x0F    ; copy 0x0F:white to video memory property address to set text color (All color value is in README.md)
 
@@ -39,16 +39,16 @@ SCREENCLEARLOOP:                   ; loop for clear screen
 
     cmp si, 80 * 25 * 2             ; compare si register with screen size:80*25
 
-    jl SCREENCLEARLOOP             ; if less, jmp SCREENCLEARLOOP
+    jl .SCREENCLEARLOOP             ; if less, jmp SCREENCLEARLOOP
 
-    push BOOTMESSAGE                   ; message address push to stack
+    push BOOTMESSAGE                ; message address push to stack
     push 0                          ; screen y-coordinate push to stack
     push 0                          ; screen x-coordinate push to stack
     call PRINTMESSAGE               ; function called
     add sp, 6                       ; parameters removed
 
     push IMAGELOADINGMESSAGE        ; message address push to stack
-    push 0                          ; screen y-coordinate push to stack
+    push 1                          ; screen y-coordinate push to stack
     push 0                          ; screen x-coordinate push to stack
     call PRINTMESSAGE               ; function called
     add sp, 6                       ; parameters removed
@@ -155,20 +155,20 @@ PRINTMESSAGE:               ; message print function
     mov si, word [ bp + 8 ]     ; 3rd parameter(address of message)
 
 
-MESSAGELOOP:                       ; loop for print messages
-    mov cl, byte [ si + BOOTMESSAGE]   ; copy address of BOOTMESSAGE + si register to cl register
+.MESSAGELOOP:                       ; loop for print messages
+    mov cl, byte [ si ]             ; copy address of si register to cl register
 
     cmp cl, 0                       ; compare cl register with 0
-    je MESSAGEEND                  ; if 0, message printing end
+    je .MESSAGEEND                  ; if 0, message printing end
 
     mov byte [ es: di ], cl         ; if not 0, print message to 0xB800:di
 
     add si, 1                       ; move to next text of message
     add di, 2                       ; move to next address of video memory
 
-    jmp MESSAGELOOP                ; keep print messages
+    jmp .MESSAGELOOP                ; keep print messages
 
-MESSAGEEND:
+.MESSAGEEND:
     pop dx      ; used register poped inverse
     pop cx      
     pop ax      
@@ -181,7 +181,7 @@ MESSAGEEND:
 
 ;   DATA    ;
 BOOTMESSAGE:      db 'BOOT START!!', 0                     ; message defined
-                                                        ; last bit is 0 to identify its end
+                                                           ; last bit is 0 to identify its end
 DISKERRORMESSAGE:   db  'DISK ERROR!!', 0
 IMAGELOADINGMESSAGE:    db  'OS Image Loading...', 0
 LOADINGCOMPLETEMESSAGE: db  'Complete~!!', 0
