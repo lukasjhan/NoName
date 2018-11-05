@@ -1,4 +1,4 @@
-# filename          /Kernel32/src/EntryPoint.s
+# filename          /Kernel32/Source/EntryPoint.s
 # date              2018.11.05
 # last edit date    2018.11.05
 # author            NO.00[UNKNOWN]

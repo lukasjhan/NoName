@@ -1,4 +1,4 @@
-/* filename          /Kernel32/src/Types.h
+/* filename          /Kernel32/Source/Types.h
  * date              2018.11.05
  * last edit date    2018.11.05
  * author            NO.00[UNKNOWN]

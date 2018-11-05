@@ -1,4 +1,4 @@
-/* filename          /Kernel32/src/Main.c
+/* filename          /Kernel32/Source/Main.c
  * date              2018.11.05
  * last edit date    2018.11.05
  * author            NO.00[UNKNOWN]
