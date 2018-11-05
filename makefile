@@ -4,7 +4,7 @@
 # author            NO.00[UNKNOWN]
 # brief             root makefile
 
-all: BootLoader Disk.img
+all: BootLoader Kernel32 Disk.img
 
 BootLoader:
 	@echo 
