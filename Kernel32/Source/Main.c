@@ -11,6 +11,7 @@ void kPrintString( int iX, int iY, const char* pcString );
 /**
  *  Start Point for C Kernel
  *  MUST BE FIRST PLACE !!!
+ *  Address 0x10200
  */
 void Main( void )
 {
