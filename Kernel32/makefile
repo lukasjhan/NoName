@@ -6,7 +6,7 @@
 
 all: Kernel32.bin
 
-Kernel32.bin: Source/EntryPoint.s
+Kernel32.bin: src/EntryPoint.s
 	nasm -o Kernel32.bin $<
 
 clean:
