@@ -24,7 +24,7 @@ Kernel32:
 	@echo Building 32bit Kernel COMPLETE!!!
 	@echo
 
-Disk.img: BootLoader Kernel32
+Disk.img: BootLoader/BootLoader.bin Kernel32/Kernel32.bin
 	@echo
 	@echo OS image Building START!!!
 
