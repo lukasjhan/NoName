@@ -1,13 +1,13 @@
 # filename          /Kernel32/makefile
 # date              2018.10.31
-# last edit date    2018.10.31
+# last edit date    2018.11.05
 # author            NO.00[UNKNOWN]
 # brief             makefile for protected mode(32bit) kernel
 
-all: testOS.bin
+all: Kernel32.bin
 
-testOS.bin: testOS.asm
-	nasm -o testOS.bin testOS.asm
+Kernel32.bin: Source/EntryPoint.s
+	nasm -o Kernel32.bin $<
 
 clean:
-	rm -f testOS.bin
+	rm -f Kernel32.bin
