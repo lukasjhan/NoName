@@ -28,7 +28,7 @@ Disk.img: BootLoader/BootLoader.bin Kernel32/Kernel32.bin
 	@echo
 	@echo OS image Building START!!!
 
-	cat BootLoader/BootLoader.bin Kernel32/testOS.bin > Disk.img
+	cat BootLoader/BootLoader.bin Kernel32/Kernel32.bin > Disk.img
 
 	@echo OS image Building COMPLETE!!!
 
