@@ -78,7 +78,7 @@ MESSAGELOOP:
     mov cl, byte [ esi ]
 
     cmp cl, 0
-    je .MESSAGEEND
+    je MESSAGEEND
 
     mov byte [ edi + 0xB8000 ], cl
     
