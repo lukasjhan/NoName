@@ -49,8 +49,7 @@ PROTECTEDMODE:
     call PRINTMESSAGE
     add esp, 12
 
-    jmp $                   ; infinite loop
-                            ; additional code will be placed here!!
+    jmp dword 0x08: 0x10200  ; jump to C kernel main entry point
 
 ;   FUNCTION    ;
 PRINTMESSAGE:
