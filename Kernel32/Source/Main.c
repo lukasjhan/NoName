@@ -1,6 +1,6 @@
 /* filename          /Kernel32/Source/Main.c
  * date              2018.11.05
- * last edit date    2018.11.05
+ * last edit date    2018.11.06
  * author            NO.00[UNKNOWN]
  * brief             start point for C kernel
 */
