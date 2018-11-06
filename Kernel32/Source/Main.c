@@ -7,6 +7,7 @@
 #include "Types.h"
 
 void kPrintString( int iX, int iY, const char* pcString );
+BOOL kInitializeKernel64Area( void );
 
 /**
  *  Start Point for C Kernel
@@ -15,9 +16,14 @@ void kPrintString( int iX, int iY, const char* pcString );
  */
 void Main( void )
 {
+    DWORD i;
+
     kPrintString( 0, 3, "C Language Kernel Started~!!!" );
 
-    while( 1 ) ;
+    kInitializeKernel64Area();
+    kPrintString( 0, 4, "IA-32e Kernel Area Initialization Complete");
+
+    while ( 1 ) ;
 }
 
 /**
@@ -35,7 +41,36 @@ void kPrintString( int iX, int iY, const char* pcString )
     pstScreen += ( iY * 80 ) + iX;
     
     for ( i = 0 ; pcString[ i ] != 0 ; i++ )
-    {
         pstScreen[ i ].bCharactor = pcString[ i ];
+    
+}
+
+/**
+ *  function name : kPrintString
+ *  Parameters    : iX(int) - screen x corr
+ *                  iY(int) - screen y corr
+ *                  pcStirng(const char*) - string address
+ *  return type   : BOOL
+ *  return value  : FALSE - memory error
+ *                  TRUE  - init success
+ *  brief         : init memory
+ */
+BOOL kInitializeKernel64Area( void )
+{
+    DWORD* pdwCurrentAddress;
+
+    // Init start address : 1MB
+    pdwCurrentAddress = ( DWORD* ) 0x100000;
+
+    // 1~6MB init by 0
+    while ( ( DWORD ) pdwCurrentAddress < 0x600000 )
+    {
+        *pdwCurrentAddress = 0x00;
+
+        // memory error
+        if ( *pdwCurrentAddress != 0 ) return FALSE;
+
+        pdwCurrentAddress++;
     }
+    return TRUE;
 }
