@@ -47,9 +47,6 @@ void kPrintString( int iX, int iY, const char* pcString )
 
 /**
  *  function name : kPrintString
- *  Parameters    : iX(int) - screen x corr
- *                  iY(int) - screen y corr
- *                  pcStirng(const char*) - string address
  *  return type   : BOOL
  *  return value  : FALSE - memory error
  *                  TRUE  - init success
@@ -71,6 +68,32 @@ BOOL kInitializeKernel64Area( void )
         if ( *pdwCurrentAddress != 0 ) return FALSE;
 
         pdwCurrentAddress++;
+    }
+    return TRUE;
+}
+
+/**
+ *  function name : kIsMemoryEnough
+ *  return type   : BOOL
+ *  return value  : FALSE - memory error
+ *                  TRUE  - check success
+ *  brief         : check memory
+ */
+BOOL kIsMemoryEnough( void )
+{
+    DWORD* pdwCurrentAddress;
+   
+    // check memory from 0x100000(1MB)
+    pdwCurrentAddress = ( DWORD* ) 0x100000;
+    
+    // to 64MB
+    while ( ( DWORD ) pdwCurrentAddress < 0x4000000 )
+    {
+        // write random value to check memory
+        *pdwCurrentAddress = 0x12345678;
+        if( *pdwCurrentAddress != 0x12345678 ) return FALSE;
+        
+        pdwCurrentAddress += ( 0x100000 / 4 );
     }
     return TRUE;
 }

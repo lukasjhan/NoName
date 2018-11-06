@@ -15,6 +15,22 @@ START:
     mov ds, ax      ; set DS register
     mov es, ax      ; set ES register
 
+    ; A20 gate activate
+    mov ax, 0x2401  ; A20 gate activate service setting
+    int 0x15        ; BIOS service called
+
+    jc A20GATEERROR ; check A20 gate activation success
+    jmp A20GATESUCCESS
+
+A20GATEERROR:
+    ; if error, use system control port
+    in al, 0x92     ; read 1 byte from system control port(0x92)
+    or al, 0x02     ; A20 gate bit set 1
+    and al, 0xFE    ; set bit 0 to 0
+    out 0x92, al    ; set system control port
+
+A20GATESUCCESS:
+
     cli             ; set no interrupts
     lgdt [ GDTR ]   ; load GDT table
 
