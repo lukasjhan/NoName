@@ -1,6 +1,6 @@
 /* filename          /Kernel32/Source/Main.c
  * date              2018.11.05
- * last edit date    2018.11.06
+ * last edit date    2018.11.07
  * author            NO.00[UNKNOWN]
  * brief             start point for C kernel
 */
@@ -63,7 +63,12 @@ void Main( void )
     {
         kPrintString( 45, 8, "Fail" );
         kPrintString( 0, 9, "This processor does not support 64bit mode~!!" );
+        while ( 1 );
     }
+
+    kPrintString( 0, 9, "Switch To IA-32e Mode" );
+	// TODO: Write function switching to 64bit kernel!!
+    //kSwitchAndExecute64bitKernel();
 
     while( 1 ) ;
 }

@@ -1,6 +1,6 @@
 # filename          /Kernel32/Source/EntryPoint.s
 # date              2018.11.05
-# last edit date    2018.11.06
+# last edit date    2018.11.07
 # author            NO.00[UNKNOWN]
 # brief             define entry point for kernel32 c function
 
