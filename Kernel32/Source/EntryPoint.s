@@ -42,12 +42,12 @@ A20GATESUCCESS:
     mov cr0, eax        ; Flags is set on CR0 control register
 
     ; SC segment selector : EIP, reset by 0x00
-    jmp dword 0x08: ( PROTECTEDMODE - $$ + 0x10000 )
+    jmp dword 0x18: ( PROTECTEDMODE - $$ + 0x10000 )
 
 ; Enter Protected mode
 [BITS 32]                   ; 16bit CODE
 PROTECTEDMODE:
-    mov ax, 0x10            ; data segment descriptor stored in ax register
+    mov ax, 0x20            ; data segment descriptor stored in ax register
     mov ds, ax
     mov es, ax
     mov fs, ax
@@ -65,7 +65,7 @@ PROTECTEDMODE:
     call PRINTMESSAGE
     add esp, 12
 
-    jmp dword 0x08: 0x10200  ; jump to C kernel main entry point
+    jmp dword 0x18: 0x10200  ; jump to C kernel main entry point
 
 ;   FUNCTION    ;
 PRINTMESSAGE:
@@ -131,6 +131,24 @@ GDT:
         db 0x00
         db 0x00
         db 0x00
+
+     ; IA-32e mode Kernel code segment descriptor
+    IA_32eCODEDESCRIPTOR:     
+        dw 0xFFFF       ; Limit [15:0]
+        dw 0x0000       ; Base [15:0]
+        db 0x00         ; Base [23:16]
+        db 0x9A         ; P=1, DPL=0, Code Segment, Execute/Read
+        db 0xAF         ; G=1, D=0, L=1, Limit[19:16]
+        db 0x00         ; Base [31:24]  
+        
+    ; IA-32e mode Kernel data segment descriptor
+    IA_32eDATADESCRIPTOR:
+        dw 0xFFFF       ; Limit [15:0]
+        dw 0x0000       ; Base [15:0]
+        db 0x00         ; Base [23:16]
+        db 0x92         ; P=1, DPL=0, Data Segment, Read/Write
+        db 0xAF         ; G=1, D=0, L=1, Limit[19:16]
+        db 0x00         ; Base [31:24]
     
     ; Code segment descriptor for protected mode
     CODEDESCRIPTOR:     
