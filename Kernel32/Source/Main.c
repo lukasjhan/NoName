@@ -25,7 +25,7 @@ void Main( void )
     if ( kIsMemoryEnough() == FALSE )
     {
         kPrintString( 45, 4, "Fail" );
-        kPrintString( 0, 5, "Not Enough Memory~!! MINT64 OS Requires Over 64Mbyte Memory~!!" );
+        kPrintString( 0, 5, "Not Enough Memory~!!" );
         while ( 1 ) ;
     }
     else kPrintString( 45, 4, "Pass" );
