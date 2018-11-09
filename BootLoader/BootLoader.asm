@@ -12,9 +12,9 @@ SECTION .text       ; define text segment
 jmp 0x07C0:START    ; copy 0x07C0 to CS segment register, move START lable
 
 ;   OS environment value
-TOTALSECTORCOUNT:   dw      1024    ; OS image size except bootloader
-                                    ; max 1152 sector
-
+TOTALSECTORCOUNT:      dw      0x02    ; OS image size except bootloader
+                                       ; max 1152 sector
+KERNEL32SECTORCOUNT:   dw      0x02    ; protected mode kernel sector
 
 ;   CODE   ;
 START:
