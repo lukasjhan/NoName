@@ -24,7 +24,16 @@ Kernel32:
 	@echo Building 32bit Kernel COMPLETE!!!
 	@echo
 
-Disk.img: BootLoader/BootLoader.bin Kernel32/Kernel32.bin
+Kernel64:
+	@echo 
+	@echo Building 64bit Kernel STRAT!!!
+
+	make -C Kernel64
+
+	@echo Building 64bit Kernel COMPLETE!!!
+	@echo
+
+Disk.img: BootLoader/BootLoader.bin Kernel32/Kernel32.bin Kernel64/Kernel64.bin
 	@echo
 	@echo OS image Building START!!!
 
@@ -36,4 +45,5 @@ Disk.img: BootLoader/BootLoader.bin Kernel32/Kernel32.bin
 clean:
 	make -C BootLoader clean
 	make -C Kernel32 clean
+	make -C Kernel64 clean
 	rm -f Disk.img
