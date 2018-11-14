@@ -1,6 +1,6 @@
 # filename          /BootLoader/BootLoader.asm
 # date              2018.10.30
-# last edit date    2018.10.31
+# last edit date    2018.11.09
 # author            NO.00[UNKNOWN]
 # brief             Bootloader source code file
 

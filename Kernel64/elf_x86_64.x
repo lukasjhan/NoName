@@ -1,4 +1,4 @@
-# filename          /Kernel64/elf_i386.x
+# filename          /Kernel64/elf_x86_64.x
 # date              2018.11.09
 # last edit date    2018.11.09
 # author            NO.00[UNKNOWN]
@@ -26,7 +26,6 @@ SECTIONS
   .rodata         : { *(.rodata .rodata.* .gnu.linkonce.r.*) }
   .rodata1        : { *(.rodata1) }
 
-  /* 데이터 영역의 시작을 섹터 단위로 맞춤 */
   . = ALIGN (512);
 
   .data           :
