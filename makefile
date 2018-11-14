@@ -37,7 +37,7 @@ Disk.img: BootLoader/BootLoader.bin Kernel32/Kernel32.bin Kernel64/Kernel64.bin
 	@echo
 	@echo OS image Building START!!!
 
-	cat BootLoader/BootLoader.bin Kernel32/Kernel32.bin > Disk.img
+	./ImageBuilder $^
 
 	@echo OS image Building COMPLETE!!!
 
