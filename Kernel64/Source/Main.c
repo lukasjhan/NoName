@@ -6,18 +6,50 @@
 */
 
 #include "Types.h"
+#include "Keyboard.h"
 
 void kPrintString( int iX, int iY, const char* pcString );
 
 /**
  *  Start Point for C Kernel
  *  MUST BE FIRST PLACE !!!
- *  Address 0x10200
+ *  Address 0x200000
  */
 void Main( void )
 {
-    kPrintString( 0, 10, "Switch To IA-32e Mode Success!");
-    kPrintString( 0, 10, "IA-32e C Kernel Start..............[PASS]");
+    char vcTemp[ 2 ] = { 0 , };
+    BYTE bFlags;
+    BYTE bTemp;
+    int i = 0;
+
+    kPrintString( 0, 10, "Switch To IA-32e Mode Success!" );
+    kPrintString( 0, 11, "IA-32e C Kernel Start..............[PASS]" );
+    kPrintString( 0, 12, "Keyboard Activate..................[    ]" );
+
+    if ( kActivateKeyboard() == TRUE )
+    {
+        kPrintStirng( 45, 12, "PASS" );
+        kChangeKeyboardLED( FALSE, FALSE, FALSE );
+    }
+    else
+    {
+        kPrintStirng( 45, 12, "Fail" );
+        while ( 1 );
+    }
+
+    while ( 1 )
+    {
+        if ( kIsOutputBufferFull() == TRUE )
+        {
+            bTemp = kGetKeyboardScanCode();
+        
+            if ( kConvertScanCodeToASCIICode( bTemp, &( vcTemp[ 0 ] ), &bFlags ) == TRUE )
+            {
+                if( bFlags & KEY_FLAGS_DOWN )
+                    kPrintString( i++, 13, vcTemp );
+            }
+        }
+    }
 }
 
 
