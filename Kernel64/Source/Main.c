@@ -24,16 +24,16 @@ void Main( void )
 
     kPrintString( 0, 10, "Switch To IA-32e Mode Success!" );
     kPrintString( 0, 11, "IA-32e C Kernel Start..............[PASS]" );
-    kPrintString( 0, 12, "Keyboard Activate..................[    ]" );
+    kPrintString( 0, 12, "Keyboard Activate...........................[    ]" );
 
     if ( kActivateKeyboard() == TRUE )
     {
-        kPrintStirng( 45, 12, "PASS" );
+        kPrintStirng( 45, 15, "PASS" );
         kChangeKeyboardLED( FALSE, FALSE, FALSE );
     }
     else
     {
-        kPrintStirng( 45, 12, "Fail" );
+        kPrintStirng( 45, 15, "Fail" );
         while ( 1 );
     }
 
