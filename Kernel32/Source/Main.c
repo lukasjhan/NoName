@@ -11,6 +11,7 @@
 void kPrintString( int iX, int iY, const char* pcString );
 BOOL kInitializeKernel64Area( void );
 BOOL kIsMemoryEnough( void );
+void kCopyKernel64ImageTo2Mbyte( void );
 
 /**
  *  Start Point for C Kernel
@@ -23,7 +24,7 @@ void Main( void )
     DWORD dwEAX, dwEBX, dwECX, dwEDX;
     char vcVendorString[ 13 ] = { 0, };
 
-    kPrintString( 0, 3, "C Language Kernel Started~!!!" );
+    kPrintString( 0, 3, "Protected Mode Kernel Start...............[PASS]" );
 
     kPrintString( 0, 4, "Minimum Memory Size Check...................[    ]" );
     if ( kIsMemoryEnough() == FALSE )
@@ -66,9 +67,12 @@ void Main( void )
         while ( 1 );
     }
 
+    kPrintString( 0, 9, "Copy IA-32e Kernel To 2M Address............[    ]" );
+    kCopyKernel64ImageTo2Mbyte();
+    kPrintString( 45, 9, "Pass" );
+
     kPrintString( 0, 9, "Switch To IA-32e Mode" );
-	// TODO: Write function switching to 64bit kernel!!
-    //kSwitchAndExecute64bitKernel();
+    kSwitchAndExecute64bitKernel();
 
     while( 1 ) ;
 }
@@ -93,7 +97,7 @@ void kPrintString( int iX, int iY, const char* pcString )
 }
 
 /**
- *  function name : kPrintString
+ *  function name : kInitializeKernel64Area
  *  return type   : BOOL
  *  return value  : FALSE - memory error
  *                  TRUE  - init success
@@ -143,4 +147,28 @@ BOOL kIsMemoryEnough( void )
         pdwCurrentAddress += ( 0x100000 / 4 );
     }
     return TRUE;
+}
+
+/**
+ *  function name : kCopyKernel64ImageTo2Mbyte
+ *  brief         : copy IA-32e mode kernel to 2Mbyte address
+ */
+void kCopyKernel64ImageTo2Mbyte( void )
+{
+    WORD wKernel32SectorCount, wTotalKernelSectorCount;
+    DWORD* pdwSourceAddress,* pdwDestinationAddress;
+    int i;
+    
+    wTotalKernelSectorCount = *( ( WORD* ) 0x7C05 );
+    wKernel32SectorCount = *( ( WORD* ) 0x7C07 );
+
+    pdwSourceAddress = ( DWORD* ) ( 0x10000 + ( wKernel32SectorCount * 512 ) );
+    pdwDestinationAddress = ( DWORD* ) 0x200000;
+
+    for ( i = 0 ; i < 512 * ( wTotalKernelSectorCount - wKernel32SectorCount ) / 4; i++ )
+    {
+        *pdwDestinationAddress = *pdwSourceAddress;
+        pdwDestinationAddress++;
+        pdwSourceAddress++;
+    }
 }
