@@ -1,6 +1,6 @@
 /* filename          /Kernel64/Source/InterruptHandler.h
- * date              2018.11.20
- * last edit date    2018.11.20
+ * date              2018.11.22
+ * last edit date    2018.11.22
  * author            NO.00[UNKNOWN]
  * brief             header file for InterruptHandler.c
 */
