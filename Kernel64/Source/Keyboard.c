@@ -369,7 +369,7 @@ BOOL kIsNumberPadScanCode( BYTE bScanCode )
  *  parameters    : bScanCode(BYTE)
  *  brief         : check input scan code is combined key
  */
-BOOL kIsUseCombinedCode( BOOL bScanCode )
+BOOL kIsUseCombinedCode( BYTE bScanCode )
 {
     BYTE bDownScanCode;
     BOOL bUseCombinedKey;
