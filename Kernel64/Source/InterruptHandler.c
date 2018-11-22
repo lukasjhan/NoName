@@ -7,6 +7,7 @@
 
 #include "InterruptHandler.h"
 #include "PIC.h"
+#include "Keyboard.h"
 
 /**
  *  function name : kCommonExceptionHandler
@@ -60,14 +61,22 @@ void kCommonInterruptHandler( int iVectorNumber )
  */
 void kKeyboardHandler( int iVectorNumber )
 {
-    char vcBuffer[] = "[INT:  , ]";
+    char vcBuffer[]                      = "[INT:  , ]";
     static int g_iKeyboardInterruptCount = 0;
+    BYTE bTemp;
 
-    vcBuffer[ 5 ] = '0' + iVectorNumber / 10;
-    vcBuffer[ 6 ] = '0' + iVectorNumber % 10;
-    vcBuffer[ 8 ] = '0' + g_iKeyboardInterruptCount;
-    g_iKeyboardInterruptCount = ( g_iKeyboardInterruptCount + 1 ) % 10;
+    vcBuffer[ 5 ]                        = '0' + iVectorNumber / 10;
+    vcBuffer[ 6 ]                        = '0' + iVectorNumber % 10;
+    vcBuffer[ 8 ]                        = '0' + g_iKeyboardInterruptCount;
+    g_iKeyboardInterruptCount            = ( g_iKeyboardInterruptCount + 1 ) % 10;
     kPrintString( 0, 0, vcBuffer );
+
+    // put data into Queue
+    if ( kIsOutputBufferFull() == TRUE )
+    {
+        bTemp = kGetKeyboardScanCode();
+        kConvertScanCodeAndPutQueue( bTemp );
+    }
 
     // send EOI
     kSendEOIToPIC( iVectorNumber - PIC_IRQSTARTVECTOR );
