@@ -8,7 +8,7 @@
 
 SECTION .text       
 
-global kInPortByte, kOutPortByte
+global kInPortByte, kOutPortByte, kLoadGDTR, kLoadTR, kLoadIDTR
 
 ; function name : kInPortByte
 ; parametor     : port number
@@ -37,4 +37,25 @@ kOutPortByte:
 
     pop rax
     pop rdx
+    ret
+
+; function name : kLoadGDTR
+; parametor     : GDT table address
+; brief         : GDTR register is set by GDT table
+kLoadGDTR:
+    lgdt [ rdi ]
+    ret
+
+; function name : kLoadTR
+; parametor     : TSS segment offset
+; brief         : TR register is set by TSS segment
+kLoadTR:
+    ltr di
+    ret
+
+; function name : kLoadIDTR
+; parametor     : IDT table address
+; brief         : IDTR register is set by IDT table
+kLoadIDTR:
+    lidt [ rdi ]
     ret
