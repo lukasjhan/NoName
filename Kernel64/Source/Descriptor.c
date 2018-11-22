@@ -7,6 +7,7 @@
 
 #include "Descriptor.h"
 #include "Utility.h"
+#include "ISR.h"
 
 /**
  *  function name : kInitializeGDTTableAndTSS
