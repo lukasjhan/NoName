@@ -1,6 +1,6 @@
 /* filename          /Kernel64/Source/Main.c
  * date              2018.11.09
- * last edit date    2018.11.09
+ * last edit date    2018.11.22
  * author            NO.00[UNKNOWN]
  * brief             start point for 64bit C kernel
 */
@@ -8,6 +8,7 @@
 #include "Types.h"
 #include "Keyboard.h"
 #include "Descriptor.h"
+#include "PIC.h"
 
 void kPrintString( int iX, int iY, const char* pcString );
 
@@ -54,6 +55,13 @@ void Main( void )
         while ( 1 );
     }
 
+    kPrintString( 0, 16, "PIC Controller And Interrupt Initialize.....[    ]" );
+    // init PIC controller enable interrupt
+    kInitializePIC();
+    kMaskPICInterrupt( 0 );
+    kEnableInterrupt();
+    kPrintString( 45, 16, "Pass" );
+
     while ( 1 )
     {
         if ( kIsOutputBufferFull() == TRUE )
@@ -64,7 +72,7 @@ void Main( void )
             {
                 if( bFlags & KEY_FLAGS_DOWN )
                 {
-                    kPrintString( i++, 13, vcTemp );
+                    kPrintString( i++, 17, vcTemp );
 
                     // TEST CODE 
                     if ( vcTemp[ 0 ] == '0' )

@@ -9,6 +9,7 @@
 SECTION .text       
 
 global kInPortByte, kOutPortByte, kLoadGDTR, kLoadTR, kLoadIDTR
+global kEnableInterrupt, kDisableInterrupt, kReadRFLAGS
 
 ; function name : kInPortByte
 ; parametor     : port number
@@ -58,4 +59,26 @@ kLoadTR:
 ; brief         : IDTR register is set by IDT table
 kLoadIDTR:
     lidt [ rdi ]
+    ret
+
+; function name : kEnableInterrupt
+; parametor     : void
+; brief         : enable interrupt
+kEnableInterrupt:
+    sti             ; enable interrupt
+    ret
+
+; function name : kDisableInterrupt
+; parametor     : void
+; brief         : disable interrupt
+kDisableInterrupt:
+    cli             ; disable interrupt
+    ret
+
+; function name : kDisableInterrupt
+; parametor     : void
+; brief         : return RFLAGS register
+kReadRFLAGS:
+    pushfq                  ; save RFLAGS register into stack
+    pop rax                 ; save RFLAGS register int RAX register to set return value
     ret
