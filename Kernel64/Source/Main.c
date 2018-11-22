@@ -46,7 +46,13 @@ void Main( void )
             if ( kConvertScanCodeToASCIICode( bTemp, &( vcTemp[ 0 ] ), &bFlags ) == TRUE )
             {
                 if( bFlags & KEY_FLAGS_DOWN )
+                {
                     kPrintString( i++, 13, vcTemp );
+
+                    // TEST CODE 
+                    if ( vcTemp[ 0 ] == '0' )
+                        bTemp = bTemp / 0; // Interrupt handler will be executed!
+                }
             }
         }
     }
