@@ -28,12 +28,12 @@ void Main( void )
 
     if ( kActivateKeyboard() == TRUE )
     {
-        kPrintStirng( 45, 15, "PASS" );
+        kPrintString( 45, 15, "PASS" );
         kChangeKeyboardLED( FALSE, FALSE, FALSE );
     }
     else
     {
-        kPrintStirng( 45, 15, "Fail" );
+        kPrintString( 45, 15, "Fail" );
         while ( 1 );
     }
 
@@ -63,7 +63,7 @@ void Main( void )
  *  function name : kPrintString
  *  Parameters    : iX(int) - screen x corr
  *                  iY(int) - screen y corr
- *                  pcStirng(const char*) - string address
+ *                  pcString(const char*) - string address
  *  brief         : print string to screen
  */
 void kPrintString( int iX, int iY, const char* pcString )
