@@ -12,5 +12,11 @@
 
 BYTE kInPortByte( WORD wPort );
 void kOutPortByte( WORD wPort, BYTE bData );
+void kLoadGDTR( QWORD gwGDTAddress );
+void kLoadTR( WORD wTSSSegmentOffset );
+void kLoadIDTR( QWORD qwIDTAddress );
+void kEnableInterrupt( void );
+void kDisableInterrupt( void );
+QWORD kReadRFLAGS( void );
 
 #endif /*__ASSEMBLYUTILITY_H__*/
