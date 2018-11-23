@@ -1,6 +1,6 @@
 # NoName
 
-Micro OS for small system.
+OS for x86-64 system
 
 # Directory Description
 
