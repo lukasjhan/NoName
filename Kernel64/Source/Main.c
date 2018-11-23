@@ -1,6 +1,6 @@
 /* filename          /Kernel64/Source/Main.c
  * date              2018.11.09
- * last edit date    2018.11.22
+ * last edit date    2018.11.23
  * author            NO.00[UNKNOWN]
  * brief             start point for 64bit C kernel
 */
@@ -9,8 +9,8 @@
 #include "Keyboard.h"
 #include "Descriptor.h"
 #include "PIC.h"
-
-void kPrintString( int iX, int iY, const char* pcString );
+#include "Console.h"
+#include "ConsoleShell.h"
 
 /**
  *  Start Point for C Kernel
@@ -19,84 +19,62 @@ void kPrintString( int iX, int iY, const char* pcString );
  */
 void Main( void )
 {
-    char vcTemp[ 2 ] = { 0 , };
-    BYTE bFlags;
-    BYTE bTemp;
-    int i = 0;
-    KEYDATA stData;
+    int iCursorX, iCursorY;
 
-    kPrintString( 0, 10, "Switch To IA-32e Mode Success!" );
-    kPrintString( 0, 11, "IA-32e C Kernel Start..............[PASS]" );
-    kPrintString( 0, 12, "Keyboard Activate...........................[    ]" );
-
-    kPrintString( 0, 12, "GDT Initialize And Switch For IA-32e Mode...[    ]" );
+    // init console and print boot process
+    kInitializeConsole( 0, 10 );    
+    kPrintf( "Switch To IA-32e Mode Success~!!\n" );
+    kPrintf( "IA-32e C Language Kernel Start..............[Pass]\n" );
+    kPrintf( "Initialize Console..........................[Pass]\n" );
+    
+    kGetCursor( &iCursorX, &iCursorY );
+    kPrintf( "GDT Initialize And Switch For IA-32e Mode...[    ]" );
     kInitializeGDTTableAndTSS();
     kLoadGDTR( GDTR_STARTADDRESS );
-    kPrintString( 45, 12, "Pass" );
+    kSetCursor( 45, iCursorY++ );
+    kPrintf( "Pass\n" );
     
-    kPrintString( 0, 13, "TSS Segment Load............................[    ]" );
+    kPrintf( "TSS Segment Load............................[    ]" );
     kLoadTR( GDT_TSSSEGMENT );
-    kPrintString( 45, 13, "Pass" );
+    kSetCursor( 45, iCursorY++ );
+    kPrintf( "Pass\n" );
     
-    kPrintString( 0, 14, "IDT Initialize..............................[    ]" );
+    kPrintf( "IDT Initialize..............................[    ]" );
     kInitializeIDTTables();    
     kLoadIDTR( IDTR_STARTADDRESS );
-    kPrintString( 45, 14, "Pass" );
+    kSetCursor( 45, iCursorY++ );
+    kPrintf( "Pass\n" );
     
-    kPrintString( 0, 15, "Keyboard Activate And Queue Initialize......[    ]" );
+    kPrintf( "Total RAM Size Check........................[    ]" );
+    kCheckTotalRAMSize();
+    kSetCursor( 45, iCursorY++ );
+    kPrintf( "Pass], Size = %d MB\n", kGetTotalRAMSize() );
     
+    kPrintf( "Keyboard Activate And Queue Initialize......[    ]" );
+    
+    // keyboard activate
     if ( kInitializeKeyboard() == TRUE )
     {
-        kPrintString( 45, 15, "Pass" );
+        kSetCursor( 45, iCursorY++ );
+        kPrintf( "Pass\n" );
         kChangeKeyboardLED( FALSE, FALSE, FALSE );
     }
     else
     {
-        kPrintString( 45, 15, "Fail" );
-        while ( 1 );
+        kSetCursor( 45, iCursorY++ );
+        kPrintf( "Fail\n" );
+        while ( 1 ) ;
     }
-
-    kPrintString( 0, 16, "PIC Controller And Interrupt Initialize.....[    ]" );
-    // init PIC controller enable interrupt
+    
+    // init PIC controller and enable Interrupt
+    kPrintf( "PIC Controller And Interrupt Initialize.....[    ]" );
+    
     kInitializePIC();
     kMaskPICInterrupt( 0 );
     kEnableInterrupt();
-    kPrintString( 45, 16, "Pass" );
+    kSetCursor( 45, iCursorY++ );
+    kPrintf( "Pass\n" );
 
-    while ( 1 )
-    {
-        if ( kGetKeyFromKeyQueue( &stData ) == TRUE )
-        {
-            if ( stData.bFlags & KEY_FLAGS_DOWN )
-            {
-                vcTemp[ 0 ] = stData.bASCIICode;
-                kPrintString( i++, 17, vcTemp );
-
-                // TEST CODE
-                if ( vcTemp[ 0 ] == '0' )
-                    bTemp = bTemp / 0;
-                
-            }
-        }
-    }
-}
-
-
-/**
- *  function name : kPrintString
- *  Parameters    : iX(int) - screen x corr
- *                  iY(int) - screen y corr
- *                  pcString(const char*) - string address
- *  brief         : print string to screen
- */
-void kPrintString( int iX, int iY, const char* pcString )
-{
-    CHARACTER* pstScreen = ( CHARACTER* ) 0xB8000;
-    int i;
-    
-    pstScreen += ( iY * 80 ) + iX;
-    
-    for ( i = 0 ; pcString[ i ] != 0 ; i++ )
-        pstScreen[ i ].bCharactor = pcString[ i ];
-    
+    // START SHELL
+    kStartConsoleShell();
 }
