@@ -1,6 +1,6 @@
 /* filename          /Kernel64/Source/InterruptHandler.c
  * date              2018.11.22
- * last edit date    2018.11.22
+ * last edit date    2018.11.23
  * author            NO.00[UNKNOWN]
  * brief             functions for handling interrupts
 */
