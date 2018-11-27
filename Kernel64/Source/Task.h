@@ -10,16 +10,9 @@
 
 #include "Types.h"
 
-////////////////////////////////////////////////////////////////////////////////
-//
-// 매크로
-//
-////////////////////////////////////////////////////////////////////////////////
-// SS, RSP, RFLAGS, CS, RIP + ISR에서 저장하는 19개의 레지스터
 #define TASK_REGISTERCOUNT     ( 5 + 19 )
 #define TASK_REGISTERSIZE       8
 
-// Context 자료구조의 레지스터 오프셋
 #define TASK_GSOFFSET           0
 #define TASK_FSOFFSET           1
 #define TASK_ESOFFSET           2
