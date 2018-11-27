@@ -11,6 +11,7 @@ SECTION .text
 global kInPortByte, kOutPortByte, kLoadGDTR, kLoadTR, kLoadIDTR
 global kEnableInterrupt, kDisableInterrupt, kReadRFLAGS
 global kReadTSC
+global kSwitchContext
 
 ; function name : kInPortByte
 ; parameter     : port number
