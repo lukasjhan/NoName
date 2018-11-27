@@ -19,5 +19,6 @@ void kEnableInterrupt( void );
 void kDisableInterrupt( void );
 QWORD kReadRFLAGS( void );
 QWORD kReadTSC( void );
+void kSwitchContext( CONTEXT* pstCurrentContext, CONTEXT* pstNextContext );
 
 #endif /*__ASSEMBLYUTILITY_H__*/
