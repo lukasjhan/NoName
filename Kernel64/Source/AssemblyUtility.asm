@@ -1,6 +1,6 @@
 # filename          /Kernel64/Source/AssemblyUtility.asm
 # date              2018.11.09
-# last edit date    2018.11.09
+# last edit date    2018.11.27
 # author            NO.00[UNKNOWN]
 # brief             Assembly utility functions
 
@@ -10,6 +10,7 @@ SECTION .text
 
 global kInPortByte, kOutPortByte, kLoadGDTR, kLoadTR, kLoadIDTR
 global kEnableInterrupt, kDisableInterrupt, kReadRFLAGS
+global kReadTSC
 
 ; function name : kInPortByte
 ; parametor     : port number
@@ -81,4 +82,18 @@ kDisableInterrupt:
 kReadRFLAGS:
     pushfq                  ; save RFLAGS register into stack
     pop rax                 ; save RFLAGS register int RAX register to set return value
+    ret
+
+; function name : kReadTSC
+; parametor     : NONE
+; brief         : Return Timestamp counter
+kReadTSC:
+    push rdx
+    
+    rdtsc                   ; Read Timestamp data and store it into RDX:RAX
+    
+    shl rdx, 32
+    or rax, rdx
+    
+    pop rdx
     ret
