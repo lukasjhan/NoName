@@ -83,5 +83,6 @@ void Main( void )
     kPrintf( "Pass\n" );
 
     // START SHELL
+    kCreateTask( TASK_FLAGS_LOWEST | TASK_FLAGS_IDLE, ( QWORD ) kIdleTask );
     kStartConsoleShell();
 }
