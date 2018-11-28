@@ -24,35 +24,36 @@ typedef struct kShellCommandEntryStruct
     CommandFunction pfFunction;
 } SHELLCOMMANDENTRY;
 
-// 파라미터를 처리하기위해 정보를 저장하는 자료구조
 typedef struct kParameterListStruct
 {
-    // 파라미터 버퍼의 어드레스
     const char* pcBuffer;
-    // 파라미터의 길이
     int iLength;
-    // 현재 처리할 파라미터가 시작하는 위치
     int iCurrentPosition;
 } PARAMETERLIST;
 
 #pragma pack( pop )
 
-
+// SHELL
 void kStartConsoleShell( void );
 void kExecuteCommand( const char* pcCommandBuffer );
 void kInitializeParameter( PARAMETERLIST* pstList, const char* pcParameter );
 int kGetNextParameter( PARAMETERLIST* pstList, char* pcParameter );
 
 // COMMAND
-void kHelp( const char* pcParameterBuffer );
-void kCls( const char* pcParameterBuffer );
-void kShowTotalRAMSize( const char* pcParameterBuffer );
-void kStringToDecimalHexTest( const char* pcParameterBuffer );
-void kShutdown( const char* pcParamegerBuffer );
-void kSetTimer( const char* pcParameterBuffer );
-void kWaitUsingPIT( const char* pcParameterBuffer );
-void kReadTimeStampCounter( const char* pcParameterBuffer );
-void kMeasureProcessorSpeed( const char* pcParameterBuffer );
-void kShowDateAndTime( const char* pcParameterBuffer );
+static void kHelp( const char* pcParameterBuffer );
+static void kCls( const char* pcParameterBuffer );
+static void kShowTotalRAMSize( const char* pcParameterBuffer );
+static void kStringToDecimalHexTest( const char* pcParameterBuffer );
+static void kShutdown( const char* pcParamegerBuffer );
+static void kSetTimer( const char* pcParameterBuffer );
+static void kWaitUsingPIT( const char* pcParameterBuffer );
+static void kReadTimeStampCounter( const char* pcParameterBuffer );
+static void kMeasureProcessorSpeed( const char* pcParameterBuffer );
+static void kShowDateAndTime( const char* pcParameterBuffer );
+static void kCreateTestTask( const char* pcParameterBuffer );
+static void kChangeTaskPriority( const char* pcParameterBuffer );
+static void kShowTaskList( const char* pcParameterBuffer );
+static void kKillTask( const char* pcParameterBuffer );
+static void kCPULoad( const char* pcParameterBuffer );
 
 #endif /*__CONSOLESHELL_H__*/

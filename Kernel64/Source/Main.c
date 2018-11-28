@@ -11,6 +11,8 @@
 #include "PIC.h"
 #include "Console.h"
 #include "ConsoleShell.h"
+#include "Task.h"
+#include "PIT.h"
 
 /**
  *  Start Point for C Kernel
@@ -49,6 +51,11 @@ void Main( void )
     kCheckTotalRAMSize();
     kSetCursor( 45, iCursorY++ );
     kPrintf( "Pass], Size = %d MB\n", kGetTotalRAMSize() );
+
+    kPrintf( "TCB Pool And Scheduler Initialize...........[Pass]\n" );
+    iCursorY++;
+    kInitializeScheduler();
+    kInitializePIT( MSTOCOUNT( 1 ), 1 );
     
     kPrintf( "Keyboard Activate And Queue Initialize......[    ]" );
     
@@ -76,5 +83,6 @@ void Main( void )
     kPrintf( "Pass\n" );
 
     // START SHELL
+    kCreateTask( TASK_FLAGS_LOWEST | TASK_FLAGS_IDLE, ( QWORD ) kIdleTask );
     kStartConsoleShell();
 }

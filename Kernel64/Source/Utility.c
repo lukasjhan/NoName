@@ -10,6 +10,9 @@
 #include "Utility.h"
 #include "AssemblyUtility.h"
 
+// counter for PIT controller
+volatile QWORD g_qwTickCount = 0;
+
 /**
  *  function name : kMemSet
  *  Parameters    : pvDestination(void*)
@@ -452,4 +455,15 @@ int kVSPrintf( char* pcBuffer, const char* pcFormatString, va_list ap )
     // input NULL
     pcBuffer[ iBufferIndex ] = '\0';
     return iBufferIndex;
+}
+
+/**
+ *  function name : kGetTickCount
+ *  Parameters    : void
+ *  return value  : QWORD
+ *  brief         : return tick count
+ */
+QWORD kGetTickCount( void )
+{
+    return g_qwTickCount;
 }
