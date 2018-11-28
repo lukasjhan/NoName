@@ -514,7 +514,7 @@ int kGetTaskCount( void )
  */
 TCB* kGetTCBInTCBPool( int iOffset )
 {
-    if ( ( iOffset < -1 ) && ( iOffset > TASK_MAXCOUNT ) )
+    if ( ( iOffset < -1 ) || ( iOffset > TASK_MAXCOUNT ) )
         return NULL;
     
     return &( gs_stTCBPoolManager.pstStartAddress[ iOffset ] );
