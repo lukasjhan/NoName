@@ -9,6 +9,7 @@
 
 #include "Console.h"
 #include "Keyboard.h"
+#include "Task.h"
 
 // Console info
 CONSOLEMANAGER gs_stConsoleManager = { 0, };
@@ -168,7 +169,7 @@ BYTE kGetCh( void )
     {
         while ( kGetKeyFromKeyQueue( &stData ) == FALSE )
         {
-            ; // WAITHING
+            kSchedule();
         }
         
         if ( stData.bFlags & KEY_FLAGS_DOWN )
