@@ -1,6 +1,6 @@
 /* filename          /Kernel64/Source/AssemblyUtility.h
  * date              2018.11.20
- * last edit date    2018.11.20
+ * last edit date    2018.11.28
  * author            NO.00[UNKNOWN]
  * brief             header file for AssemblyUtility.asm
 */

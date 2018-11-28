@@ -1,6 +1,6 @@
 # filename          /Kernel32/Source/ModeSwitch.asm
 # date              2018.11.07
-# last edit date    2018.11.07
+# last edit date    2018.11.28
 # author            NO.00[UNKNOWN]
 # brief             define functions to switch to 64bit mode
 
