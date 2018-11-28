@@ -9,6 +9,7 @@
 #include "AssemblyUtility.h"
 #include "Keyboard.h"
 #include "Queue.h"
+#include "Synchronization.h"
 
 /**
  *  function name : kIsOutputBufferFull
@@ -563,11 +564,9 @@ BOOL kConvertScanCodeAndPutQueue( BYTE bScanCode )
     
     if ( kConvertScanCodeToASCIICode( bScanCode, &( stData.bASCIICode ), &( stData.bFlags ) ) == TRUE )
     {
-        // disable interrupt
-        bPreviousInterrupt = kSetInterruptFlag( FALSE );
+        bPreviousInterrupt = kLockForSystemData();
         bResult            = kPutQueue( &gs_stKeyQueue, &stData );
-        // restore interrupt
-        kSetInterruptFlag( bPreviousInterrupt );
+        kUnlockForSystemData( bPreviousInterrupt );
     }
     return bResult;
 }
@@ -582,15 +581,12 @@ BOOL kGetKeyFromKeyQueue( KEYDATA* pstData )
     BOOL bResult;
     BOOL bPreviousInterrupt;
 
-    // 큐가 비었으면 키 데이터를 꺼낼 수 없음
-    if( kIsQueueEmpty( &gs_stKeyQueue ) == TRUE )
+    if ( kIsQueueEmpty( &gs_stKeyQueue ) == TRUE )
         return FALSE;
     
-    // disable interrupt
-    bPreviousInterrupt = kSetInterruptFlag( FALSE );
+    bPreviousInterrupt = kLockForSystemData();
     // remove key from Queue
     bResult            = kGetQueue( &gs_stKeyQueue, pstData );
-    // restore interrupt
-    kSetInterruptFlag( bPreviousInterrupt );
+    kUnlockForSystemData( bPreviousInterrupt );
     return bResult;
 }

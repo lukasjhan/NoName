@@ -11,7 +11,7 @@ SECTION .text
 global kInPortByte, kOutPortByte, kLoadGDTR, kLoadTR, kLoadIDTR
 global kEnableInterrupt, kDisableInterrupt, kReadRFLAGS
 global kReadTSC
-global kSwitchContext, kHlt
+global kSwitchContext, kHlt, kTestAndSet
 
 ; function name : kInPortByte
 ; parameter     : port number
@@ -211,4 +211,21 @@ kSwitchContext:
 kHlt:
     hlt
     hlt
+    ret
+
+; function name : kTestAndSet
+; parameter     : Destination address, Compare data, source data
+; brief         : test and set
+kTestAndSet:
+    mov rax, rsi
+  
+    lock cmpxchg byte [ rdi ], dl   
+    je .SUCCESS         
+
+.NOTSAME:               ; Destination != Compare
+    mov rax, 0x00
+    ret
+    
+.SUCCESS:               ; Destination = Compare
+    mov rax, 0x01
     ret
