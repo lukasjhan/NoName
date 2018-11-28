@@ -11,7 +11,7 @@ SECTION .text
 global kInPortByte, kOutPortByte, kLoadGDTR, kLoadTR, kLoadIDTR
 global kEnableInterrupt, kDisableInterrupt, kReadRFLAGS
 global kReadTSC
-global kSwitchContext
+global kSwitchContext, kHlt
 
 ; function name : kInPortByte
 ; parameter     : port number
@@ -204,3 +204,11 @@ kSwitchContext:
     
     KLOADCONTEXT
     iretq
+
+; function name : kHlt
+; parameter     : NONE
+; brief         : hlt cpu
+kHlt:
+    hlt
+    hlt
+    ret
