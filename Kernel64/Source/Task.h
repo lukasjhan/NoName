@@ -1,6 +1,6 @@
 /* filename          /Kernel64/Source/Task.h
  * date              2018.11.27
- * last edit date    2018.11.27
+ * last edit date    2018.11.28
  * author            NO.00[UNKNOWN]
  * brief             header file for Task.c
 */
