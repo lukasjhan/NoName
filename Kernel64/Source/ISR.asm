@@ -10,7 +10,7 @@ SECTION .text
 
 ; Import
 extern kCommonExceptionHandler, kCommonInterruptHandler, kKeyboardHandler
-extern kTimerHandler
+extern kTimerHandler, kDeviceNotAvailableHandler
 
 ; Exception ISR
 global kISRDivideError, kISRDebug, kISRNMI, kISRBreakPoint, kISROverflow
@@ -171,7 +171,7 @@ kISRDeviceNotAvailable:
 
     ; insert exception number into handler and call it
     mov rdi, 7
-    call kCommonExceptionHandler
+    call kDeviceNotAvailableHandler
 
     KLOADCONTEXT    
     iretq           ; restore
