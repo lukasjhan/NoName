@@ -467,3 +467,19 @@ QWORD kGetTickCount( void )
 {
     return g_qwTickCount;
 }
+
+/**
+ *  function name : kSleep
+ *  Parameters    : qwMillisecond(QWORD)
+ *  return value  : void
+ *  brief         : sleep millisecond
+ */
+void kSleep( QWORD qwMillisecond )
+{
+    QWORD qwLastTickCount;
+    
+    qwLastTickCount = g_qwTickCount;
+    
+    while ( ( g_qwTickCount - qwLastTickCount ) <= qwMillisecond )
+        kSchedule();
+}
