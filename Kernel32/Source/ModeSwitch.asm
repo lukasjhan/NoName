@@ -1,6 +1,6 @@
 # filename          /Kernel32/Source/ModeSwitch.asm
 # date              2018.11.07
-# last edit date    2018.11.07
+# last edit date    2018.11.28
 # author            NO.00[UNKNOWN]
 # brief             define functions to switch to 64bit mode
 
@@ -55,7 +55,7 @@ kReadCPUID:
 kSwitchAndExecute64bitKernel:
     ; set CR4 control register PAE bit to 1
     mov eax, cr4
-    or eax, 0x20
+    or eax, 0x620
     mov cr4, eax
     
     ; address PML4 table and enable cache
@@ -69,10 +69,10 @@ kSwitchAndExecute64bitKernel:
     or eax, 0x0100
     wrmsr
 
-    ; enable cache and paging
+    ; enable cache and paging, FPU
     mov eax, cr0
-    or eax, 0xE0000000
-    xor eax, 0x60000000 
+    or eax, 0xE000000E
+    xor eax, 0x60000004 
     mov cr0, eax
     
     ; jump to 64bit kernel

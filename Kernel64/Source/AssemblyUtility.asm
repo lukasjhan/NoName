@@ -1,6 +1,6 @@
 # filename          /Kernel64/Source/AssemblyUtility.asm
 # date              2018.11.09
-# last edit date    2018.11.27
+# last edit date    2018.11.28
 # author            NO.00[UNKNOWN]
 # brief             Assembly utility functions
 
@@ -12,6 +12,7 @@ global kInPortByte, kOutPortByte, kLoadGDTR, kLoadTR, kLoadIDTR
 global kEnableInterrupt, kDisableInterrupt, kReadRFLAGS
 global kReadTSC
 global kSwitchContext, kHlt, kTestAndSet
+global kInitializeFPU, kSaveFPUContext, kLoadFPUContext, kSetTS, kClearTS
 
 ; function name : kInPortByte
 ; parameter     : port number
@@ -229,3 +230,46 @@ kTestAndSet:
 .SUCCESS:               ; Destination = Compare
     mov rax, 0x01
     ret
+
+; FPU
+
+; function name : kInitializeFPU
+; parameter     : NONE
+; brief         : init FPU
+kInitializeFPU:
+    finit
+    ret
+
+; function name : kSaveFPUContext
+; parameter     : Buffer Address
+; brief         : save register data in context buffer
+kSaveFPUContext:
+    fxsave  [ rdi ]
+    ret
+
+; function name : kLoadFPUContext
+; parameter     : Buffer Address
+; brief         : restore register from context buffer
+kLoadFPUContext:
+    fxrstor [ rdi ]
+    ret
+
+; function name : kSetTS
+; parameter     : NONE
+; brief         : TS bit set 1
+kSetTS:
+    push rax
+
+    mov rax, cr0
+    or rax, 0x08
+    mov cr0, rax
+
+    pop rax
+    ret
+    
+; function name : kSetTS
+; parameter     : NONE
+; brief         : TS bit set 0
+kClearTS:
+    clts
+    ret    

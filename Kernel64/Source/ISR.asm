@@ -1,6 +1,6 @@
 # filename          /Kernel64/Source/ISR.asm
 # date              2018.11.09
-# last edit date    2018.11.09
+# last edit date    2018.11.28
 # author            NO.00[UNKNOWN]
 # brief             Assembly handler functions
 
@@ -10,7 +10,7 @@ SECTION .text
 
 ; Import
 extern kCommonExceptionHandler, kCommonInterruptHandler, kKeyboardHandler
-extern kTimerHandler
+extern kTimerHandler, kDeviceNotAvailableHandler
 
 ; Exception ISR
 global kISRDivideError, kISRDebug, kISRNMI, kISRBreakPoint, kISROverflow
@@ -171,7 +171,7 @@ kISRDeviceNotAvailable:
 
     ; insert exception number into handler and call it
     mov rdi, 7
-    call kCommonExceptionHandler
+    call kDeviceNotAvailableHandler
 
     KLOADCONTEXT    
     iretq           ; restore

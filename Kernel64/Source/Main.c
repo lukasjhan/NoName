@@ -1,6 +1,6 @@
 /* filename          /Kernel64/Source/Main.c
  * date              2018.11.09
- * last edit date    2018.11.23
+ * last edit date    2018.11.28
  * author            NO.00[UNKNOWN]
  * brief             start point for 64bit C kernel
 */
