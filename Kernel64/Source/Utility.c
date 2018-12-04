@@ -385,12 +385,13 @@ int kSPrintf( char* pcBuffer, const char* pcFormatString, ... )
  */
 int kVSPrintf( char* pcBuffer, const char* pcFormatString, va_list ap )
 {
-    QWORD i, j;
+    QWORD i, j, k;
     int iBufferIndex = 0;
     int iFormatLength, iCopyLength;
     char* pcCopyString;
     QWORD qwValue;
     int iValue;
+    double dValue;
     
     iFormatLength = kStrLen( pcFormatString );
     for ( i = 0 ; i < iFormatLength ; i++ ) 
