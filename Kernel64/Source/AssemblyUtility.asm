@@ -8,7 +8,8 @@
 
 SECTION .text       
 
-global kInPortByte, kOutPortByte, kLoadGDTR, kLoadTR, kLoadIDTR
+global kInPortByte, kOutPortByte, kInPortWord, kOutPortWord
+global kLoadGDTR, kLoadTR, kLoadIDTR
 global kEnableInterrupt, kDisableInterrupt, kReadRFLAGS
 global kReadTSC
 global kSwitchContext, kHlt, kTestAndSet
@@ -39,6 +40,34 @@ kOutPortByte:
     mov rax, rsi    ; save 1st parameter(data) into RAX register
     out dx, al      ; Write 1 byte that is in AL register into address that dx register point to
 
+    pop rax
+    pop rdx
+    ret
+
+; function name : kInPortWord
+; parameter     : port number, data
+; brief         : read 2 byte into port
+kInPortWord:
+    push rdx        
+    
+    mov rdx, rdi
+    mov rax, 0
+    in ax, dx
+    
+    pop rdx
+    ret
+    
+; function name : kOutPortWord
+; parameter     : port number, data
+; brief         : Write 2 byte into port
+kOutPortWord:
+    push rdx
+    push rax
+    
+    mov rdx, rdi
+    mov rax, rsi  
+    out dx, ax
+    
     pop rax
     pop rdx
     ret

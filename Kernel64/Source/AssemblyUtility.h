@@ -13,6 +13,8 @@
 
 BYTE kInPortByte( WORD wPort );
 void kOutPortByte( WORD wPort, BYTE bData );
+WORD kInPortWord( WORD wPort );
+void kOutPortWord( WORD wPort, WORD wData );
 void kLoadGDTR( QWORD gwGDTAddress );
 void kLoadTR( WORD wTSSSegmentOffset );
 void kLoadIDTR( QWORD qwIDTAddress );
