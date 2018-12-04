@@ -1,3 +1,6 @@
 [submodule "imagebuilder"]
 	path = imagebuilder
 	url = git@gitlab.com:team-nameless/imagebuilder.git
+[submodule "qemu"]
+	path = qemu
+	url = git@gitlab.com:team-nameless/qemu.git
