@@ -5,22 +5,34 @@ OS for x86-64 system
 # Directory Description
 
 * /BootLoader : BootLoader for OS - Protopyte Complete
-* /Kernel32   : Working
+* /Kernel32   : Protected Mode Kernel
+* /Kernel64   : 64bit Kernel - Working
 
-# Source Code File Templete
+# Feature
 
-At the top of the source code file, it must contain
+## DONE
 
-* filename
-* date
-* last edit date
-* author
-* brief
+* BootLoader
+* interrupt
+* timer
+* synchronization
+* Keyboard
+* console
+* real number
+* multitask
+* process & thread
+* HDD driver
 
-## Example
+## Working
 
-`filename          /BootLoader/BootLoader.asm`  
-`date              2018.10.30`  
-`last edit date    2018.10.30`  
-`author            NO.00[UNKNOWN]`  
-`brief             Bootloader source code file`
+* File System
+
+## TO-DO
+
+* C standard functions
+* cache & ram disk
+* multi-core
+* symentic I/O mode
+* GUI & mouse driver
+* system call
+* user level
