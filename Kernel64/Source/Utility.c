@@ -1,6 +1,6 @@
 /* filename          /Kernel64/Source/Utility.c
  * date              2018.11.20
- * last edit date    2018.11.28
+ * last edit date    2018.12.06
  * author            NO.00[UNKNOWN]
  * brief             source code of utility functions for OS
 */

@@ -1,6 +1,6 @@
 /* filename          /Kernel64/Source/RAMDisk.c
- * date              2018.11.23
- * last edit date    2018.11.28
+ * date              2018.12.06
+ * last edit date    2018.12.06
  * author            NO.00[UNKNOWN]
  * brief             source code for ram disk
 */
@@ -86,7 +86,7 @@ int kWriteRDDSector( BOOL bPrimary, BOOL bMaster, DWORD dwLBA, int iSectorCount,
 {
     int iRealWriteCount;
 
-    iRealReadCount = MIN( gs_stRDDManager.dwTotalSectorCount - dwLBA, iSectorCount );
+    iRealWriteCount = MIN( gs_stRDDManager.dwTotalSectorCount - dwLBA, iSectorCount );
 
     kMemCpy( gs_stRDDManager.pbBuffer + ( dwLBA * 512 ), pcBuffer, iRealWriteCount * 512 );
     

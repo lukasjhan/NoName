@@ -1,6 +1,6 @@
 /* filename          /Kernel64/Source/CacheManager.c
- * date              2018.11.23
- * last edit date    2018.11.28
+ * date              2018.12.06
+ * last edit date    2018.12.06
  * author            NO.00[UNKNOWN]
  * brief             source code for caching
 */
