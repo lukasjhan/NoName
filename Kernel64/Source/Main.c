@@ -1,6 +1,6 @@
 /* filename          /Kernel64/Source/Main.c
  * date              2018.11.09
- * last edit date    2018.12.04
+ * last edit date    2018.12.06
  * author            NO.00[UNKNOWN]
  * brief             start point for 64bit C kernel
 */
@@ -91,14 +91,6 @@ void Main( void )
     kPrintf( "Pass\n" );
 
     // init HDD and FileSystem
-    kPrintf( "HDD Initialize..............................[    ]" );
-    kSetCursor( 45, iCursorY++ );
-
-    if ( kInitializeHDD() == TRUE )
-        kPrintf( "Pass\n" );
-    else
-        kPrintf( "Fail\n" );
-
     kPrintf( "File System Initialize......................[    ]" );
     kSetCursor( 45, iCursorY++ );
     if( kInitializeFileSystem() == TRUE )

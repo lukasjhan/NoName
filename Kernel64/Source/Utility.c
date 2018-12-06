@@ -1,6 +1,6 @@
 /* filename          /Kernel64/Source/Utility.c
  * date              2018.11.20
- * last edit date    2018.11.28
+ * last edit date    2018.12.06
  * author            NO.00[UNKNOWN]
  * brief             source code of utility functions for OS
 */
@@ -24,10 +24,22 @@ volatile QWORD g_qwTickCount = 0;
 void kMemSet( void* pvDestination, BYTE bData, int iSize )
 {
     int i;
+    QWORD qwData;
+    int iRemainByteStartOffset;
     
-    for ( i = 0 ; i < iSize ; i++ )
-        ( ( char* ) pvDestination )[ i ] = bData;
+    // 8 byte
+    qwData = 0;
+
+    for ( i = 0 ; i < 8 ; i++ )
+        qwData = ( qwData << 8 ) | bData;
     
+    for ( i = 0 ; i < ( iSize / 8 ) ; i++ )
+        ( ( QWORD* ) pvDestination )[ i ] = qwData;
+    
+    iRemainByteStartOffset = i * 8;
+
+    for ( i = 0 ; i < ( iSize % 8 ) ; i++ )
+        ( ( char* ) pvDestination )[ iRemainByteStartOffset++ ] = bData;
 }
 
 /**
@@ -41,10 +53,19 @@ void kMemSet( void* pvDestination, BYTE bData, int iSize )
 int kMemCpy( void* pvDestination, const void* pvSource, int iSize )
 {
     int i;
+    int iRemainByteStartOffset;
     
-    for ( i = 0 ; i < iSize ; i++ )
-        ( ( char* ) pvDestination )[ i ] = ( ( char* ) pvSource )[ i ];
+    // 8 byte
+    for ( i = 0 ; i < ( iSize / 8 ) ; i++ )
+        ( ( QWORD* ) pvDestination )[ i ] = ( ( QWORD* ) pvSource )[ i ];
     
+    iRemainByteStartOffset = i * 8;
+    for ( i = 0 ; i < ( iSize % 8 ) ; i++ )
+    {
+        ( ( char* ) pvDestination )[ iRemainByteStartOffset ] = ( ( char* ) pvSource )[ iRemainByteStartOffset ];
+        iRemainByteStartOffset++;
+    }
+
     return iSize;
 }
 
@@ -59,15 +80,35 @@ int kMemCpy( void* pvDestination, const void* pvSource, int iSize )
  */
 int kMemCmp( const void* pvDestination, const void* pvSource, int iSize )
 {
-    int i;
-    char cTemp;
+    int i, j;
+    int iRemainByteStartOffset;
+    QWORD qwValue;
+    char cValue;
     
-    for ( i = 0 ; i < iSize ; i++ )
+    for ( i = 0 ; i < ( iSize / 8 ) ; i++ )
     {
-        cTemp = ( ( char* ) pvDestination )[ i ] - ( ( char* ) pvSource )[ i ];
-        if ( cTemp != 0 )
-            return ( int ) cTemp;
+        qwValue = ( ( QWORD* ) pvDestination )[ i ] - ( ( QWORD* ) pvSource )[ i ];
+
+        if ( qwValue != 0 )
+        {
+            for ( i = 0 ; i < 8 ; i++ )
+            {
+                if ( ( ( qwValue >> ( i * 8 ) ) & 0xFF ) != 0 )
+                    return ( qwValue >> ( i * 8 ) ) & 0xFF;
+                
+            }
+        }
     }
+    
+    iRemainByteStartOffset = i * 8;
+    for ( i = 0 ; i < ( iSize % 8 ) ; i++ )
+    {
+        cValue = ( ( char* ) pvDestination )[ iRemainByteStartOffset ] - ( ( char* ) pvSource )[ iRemainByteStartOffset ];
+        if ( cValue != 0 )
+            return cValue;
+        
+        iRemainByteStartOffset++;
+    }    
     return 0;
 }
 

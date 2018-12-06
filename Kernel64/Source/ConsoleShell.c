@@ -1,6 +1,6 @@
 /* filename          /Kernel64/Source/ConsoleShell.c
  * date              2018.11.23
- * last edit date    2018.12.04
+ * last edit date    2018.12.06
  * author            NO.00[UNKNOWN]
  * brief             source code for shell
 */
@@ -54,6 +54,8 @@ SHELLCOMMANDENTRY gs_vstCommandTable[] =
         { "writefile", "Write Data To File, ex) writefile a.txt", kWriteDataToFile },
         { "readfile", "Read Data From File, ex) readfile a.txt", kReadDataFromFile },
         { "testfileio", "Test File I/O Function", kTestFileIO },
+        { "testperformance", "Test File Read/WritePerformance", kTestPerformance },
+        { "flush", "Flush File System Cache", kFlushCache },
 };                                     
 
 /**
@@ -321,6 +323,13 @@ static void kStringToDecimalHexTest( const char* pcParameterBuffer )
 static void kShutdown( const char* pcParamegerBuffer )
 {
     kPrintf( "System Shutdown Start...\n" );
+
+    kPrintf( "Cache Flush... ");
+    if ( kFlushFileSystemCache() == TRUE )
+        kPrintf( "Pass\n" );
+    else
+        kPrintf( "Fail\n" );
+    
     
     kPrintf( "Press Any Key To Reboot PC..." );
     kGetCh();
@@ -1421,7 +1430,7 @@ static void kShowRootDirectory( const char* pcParameterBuffer )
     }
     
     kPrintf( "\t\tTotal File Count: %d\n", iTotalCount );
-    kPrintf( "\t\tTotal File Size: %d KByte (%d Cluster)\n", dwTotalByte, dwUsedClusterCount );
+    kPrintf( "\t\tTotal File Size: %d KByte (%d Cluster)\n", dwTotalByte / 1024, dwUsedClusterCount );
     kPrintf( "\t\tFree Space: %d KByte (%d Cluster)\n", ( stManager.dwTotalClusterCount - dwUsedClusterCount ) * FILESYSTEM_CLUSTERSIZE / 1024, stManager.dwTotalClusterCount - dwUsedClusterCount );
     
     closedir( pstDirectory );
@@ -1745,4 +1754,133 @@ static void kTestFileIO( const char* pcParameterBuffer )
         kPrintf( "[Fail]\n" );
     
     kFreeMemory( pbBuffer );    
+}
+
+static void kTestPerformance( const char* pcParameterBuffer )
+{
+    FILE* pstFile;
+    DWORD dwClusterTestFileSize;
+    DWORD dwOneByteTestFileSize;
+    QWORD qwLastTickCount;
+    DWORD i;
+    BYTE* pbBuffer;
+    
+    dwClusterTestFileSize = 1024 * 1024;
+    dwOneByteTestFileSize = 16 * 1024;
+    
+    pbBuffer = kAllocateMemory( dwClusterTestFileSize );
+
+    if ( pbBuffer == NULL )
+    {
+        kPrintf( "Memory Allocate Fail\n" );
+        return ;
+    }
+    
+    kMemSet( pbBuffer, 0, FILESYSTEM_CLUSTERSIZE );
+    
+    kPrintf( "================== File I/O Performance Test ==================\n" );
+
+    kPrintf( "1.Sequential Read/Write Test(Cluster Size)\n" );
+
+    remove( "performance.txt" );
+    pstFile = fopen( "performance.txt", "w" );
+    if ( pstFile == NULL )
+    {
+        kPrintf( "File Open Fail\n" );
+        kFreeMemory( pbBuffer );
+        return ;
+    }
+    
+    qwLastTickCount = kGetTickCount();
+    for ( i = 0 ; i < ( dwClusterTestFileSize / FILESYSTEM_CLUSTERSIZE ) ; i++ )
+    {
+        if ( fwrite( pbBuffer, 1, FILESYSTEM_CLUSTERSIZE, pstFile ) != FILESYSTEM_CLUSTERSIZE )
+        {
+            kPrintf( "Write Fail\n" );
+            fclose( pstFile );
+            kFreeMemory( pbBuffer );
+            return ;
+        }
+    }
+
+    kPrintf( "   Sequential Write(Cluster Size): %d ms\n", kGetTickCount() - qwLastTickCount );
+
+    fseek( pstFile, 0, SEEK_SET );
+    
+    qwLastTickCount = kGetTickCount();
+
+    for ( i = 0 ; i < ( dwClusterTestFileSize / FILESYSTEM_CLUSTERSIZE ) ; i++ )
+    {
+        if ( fread( pbBuffer, 1, FILESYSTEM_CLUSTERSIZE, pstFile ) != FILESYSTEM_CLUSTERSIZE )
+        {
+            kPrintf( "Read Fail\n" );
+            fclose( pstFile );
+            kFreeMemory( pbBuffer );
+            return ;
+        }
+    }
+
+    kPrintf( "   Sequential Read(Cluster Size): %d ms\n", kGetTickCount() - qwLastTickCount );
+    
+    kPrintf( "2.Sequential Read/Write Test(1 Byte)\n" );
+    
+    remove( "performance.txt" );
+    pstFile = fopen( "performance.txt", "w" );
+
+    if ( pstFile == NULL )
+    {
+        kPrintf( "File Open Fail\n" );
+        kFreeMemory( pbBuffer );
+        return ;
+    }
+    
+    qwLastTickCount = kGetTickCount();
+    for ( i = 0 ; i < dwOneByteTestFileSize ; i++ )
+    {
+        if ( fwrite( pbBuffer, 1, 1, pstFile ) != 1 )
+        {
+            kPrintf( "Write Fail\n" );
+            fclose( pstFile );
+            kFreeMemory( pbBuffer );
+            return ;
+        }
+    }
+
+    kPrintf( "   Sequential Write(1 Byte): %d ms\n", kGetTickCount() - qwLastTickCount );
+
+    fseek( pstFile, 0, SEEK_SET );
+    
+    qwLastTickCount = kGetTickCount();
+
+    for ( i = 0 ; i < dwOneByteTestFileSize ; i++ )
+    {
+        if ( fread( pbBuffer, 1, 1, pstFile ) != 1 )
+        {
+            kPrintf( "Read Fail\n" );
+            fclose( pstFile );
+            kFreeMemory( pbBuffer );
+            return ;
+        }
+    }
+
+    kPrintf( "   Sequential Read(1 Byte): %d ms\n", kGetTickCount() - qwLastTickCount );
+    
+    fclose( pstFile );
+    kFreeMemory( pbBuffer );
+}
+
+static void kFlushCache( const char* pcParameterBuffer )
+{
+    QWORD qwTickCount;
+    
+    qwTickCount = kGetTickCount();
+    
+    kPrintf( "Cache Flush... ");
+
+    if( kFlushFileSystemCache() == TRUE )
+        kPrintf( "Pass\n" );
+    else
+        kPrintf( "Fail\n" );
+
+    kPrintf( "Total Time = %d ms\n", kGetTickCount() - qwTickCount );
 }
