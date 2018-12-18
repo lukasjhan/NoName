@@ -1,6 +1,6 @@
 /* filename          /Kernel64/Source/ConsoleShell.c
  * date              2018.11.23
- * last edit date    2018.12.06
+ * last edit date    2018.12.18
  * author            NO.00[UNKNOWN]
  * brief             source code for shell
 */
@@ -19,6 +19,7 @@
 #include "FileSystem.h"
 #include "SerialPort.h"
 #include "MPConfigurationTable.h"
+#include "MultiProcessor.h"
 
 SHELLCOMMANDENTRY gs_vstCommandTable[] =
 {
@@ -60,6 +61,7 @@ SHELLCOMMANDENTRY gs_vstCommandTable[] =
         { "flush", "Flush File System Cache", kFlushCache },
         { "download", "Download Data From Serial, ex) download a.txt", kDownloadFile },
         { "showmpinfo", "Show MP Configuration Table Information", kShowMPConfigurationTable },
+        { "startap", "Start Application Processor", kStartApplicationProcessor },
 };                                     
 
 /**
@@ -2003,4 +2005,16 @@ static void kDownloadFile( const char* pcParameterBuffer )
 static void kShowMPConfigurationTable( const char* pcParameterBuffer )
 {
     kPrintMPConfigurationTable();
+}
+
+static void kStartApplicationProcessor( const char* pcParameterBuffer )
+{
+    if ( kStartUpApplicationProcessor() == FALSE )
+    {
+        kPrintf( "Application Processor Start Fail\n" );
+        return ;
+    }
+
+    kPrintf( "Application Processor Start Success\n" );
+    kPrintf( "Bootstrap Processor[APIC ID: %d] Start Application Processor\n", kGetAPICID() );
 }
