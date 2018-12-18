@@ -1,6 +1,6 @@
 /* filename          /Kernel32/Source/Main.c
  * date              2018.11.05
- * last edit date    2018.11.07
+ * last edit date    2018.12.18
  * author            NO.00[UNKNOWN]
  * brief             start point for C kernel
 */
@@ -13,6 +13,8 @@ BOOL kInitializeKernel64Area( void );
 BOOL kIsMemoryEnough( void );
 void kCopyKernel64ImageTo2Mbyte( void );
 
+#define BOOTSTRAPPROCESSOR_FLAGADDRESS  0x7C09
+
 /**
  *  Start Point for C Kernel
  *  MUST BE FIRST PLACE !!!
@@ -23,6 +25,12 @@ void Main( void )
     DWORD i;
     DWORD dwEAX, dwEBX, dwECX, dwEDX;
     char vcVendorString[ 13 ] = { 0, };
+
+    if ( *( ( BYTE* ) BOOTSTRAPPROCESSOR_FLAGADDRESS ) == 0 )
+    {
+        kSwitchAndExecute64bitKernel();
+        while( 1 ) ;
+    }
 
     kPrintString( 0, 3, "Protected Mode Kernel Start...............[PASS]" );
 

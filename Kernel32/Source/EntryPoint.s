@@ -1,6 +1,6 @@
 # filename          /Kernel32/Source/EntryPoint.s
 # date              2018.11.05
-# last edit date    2018.11.07
+# last edit date    2018.12.18
 # author            NO.00[UNKNOWN]
 # brief             define entry point for kernel32 c function
 
@@ -14,6 +14,12 @@ START:
     mov ax, 0x1000  ; segment register set protected mode start address(0x10000)
     mov ds, ax      ; set DS register
     mov es, ax      ; set ES register
+
+    mov ax, 0x0000              
+    mov es, ax                  
+    
+    cmp byte [ es: 0x7C09 ], 0x00       
+    je .APPLICATIONPROCESSORSTARTPOINT 
 
     ; A20 gate activate
     mov ax, 0x2401  ; A20 gate activate service setting
@@ -30,7 +36,7 @@ A20GATEERROR:
     out 0x92, al    ; set system control port
 
 A20GATESUCCESS:
-
+APPLICATIONPROCESSORSTARTPOINT:
     cli             ; set no interrupts
     lgdt [ GDTR ]   ; load GDT table
 
@@ -58,6 +64,9 @@ PROTECTEDMODE:
     mov esp, 0xFFFE
     mov ebp, 0xFFFE
 
+    cmp byte [ 0x7C09 ], 0x00
+    je APPLICATIONPROCESSORSTARTPOINT
+
     ; print message on screen
     push ( SWITCHSUCCESSMESSAGE - $$ + 0x10000 )
     push 2
@@ -65,6 +74,7 @@ PROTECTEDMODE:
     call PRINTMESSAGE
     add esp, 12
 
+.APPLICATIONPROCESSORSTARTPOINT:
     jmp dword 0x18: 0x10200  ; jump to C kernel main entry point
 
 ;   FUNCTION    ;
