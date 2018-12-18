@@ -1,6 +1,6 @@
 /* filename          /Kernel64/Source/Descriptor.h
  * date              2018.11.20
- * last edit date    2018.11.20
+ * last edit date    2018.12.18
  * author            NO.00[UNKNOWN]
  * brief             header file for Descriptor.c
 */
@@ -43,9 +43,9 @@
 // GDTR start address, 1Mbyte ~ 264Kbyte page table
 #define GDTR_STARTADDRESS   0x142000
 #define GDT_MAXENTRY8COUNT  3
-#define GDT_MAXENTRY16COUNT 1
+#define GDT_MAXENTRY16COUNT ( MAXPROCESSORCOUNT )
 #define GDT_TABLESIZE       ( ( sizeof( GDTENTRY8 ) * GDT_MAXENTRY8COUNT ) + ( sizeof( GDTENTRY16 ) * GDT_MAXENTRY16COUNT ) )
-#define TSS_SEGMENTSIZE     ( sizeof( TSSSEGMENT ) )
+#define TSS_SEGMENTSIZE     ( sizeof( TSSSEGMENT ) * MAXPROCESSORCOUNT )
 
 #define IDT_TYPE_INTERRUPT      0x0E
 #define IDT_TYPE_TRAP           0x0F
