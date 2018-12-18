@@ -19,7 +19,7 @@ START:
     mov es, ax                  
     
     cmp byte [ es: 0x7C09 ], 0x00       
-    je .APPLICATIONPROCESSORSTARTPOINT 
+    je APPLICATIONPROCESSORSTARTPOINT 
 
     ; A20 gate activate
     mov ax, 0x2401  ; A20 gate activate service setting
