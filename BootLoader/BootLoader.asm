@@ -1,6 +1,6 @@
 # filename          /BootLoader/BootLoader.asm
 # date              2018.10.30
-# last edit date    2018.11.09
+# last edit date    2018.12.18
 # author            NO.00[UNKNOWN]
 # brief             Bootloader source code file
 
@@ -15,6 +15,7 @@ jmp 0x07C0:START    ; copy 0x07C0 to CS segment register, move START lable
 TOTALSECTORCOUNT:      dw      0x02    ; OS image size except bootloader
                                        ; max 1152 sector
 KERNEL32SECTORCOUNT:   dw      0x02    ; protected mode kernel sector
+BOOTSTRAPPROCESSOR:    db      0x01
 
 ;   CODE   ;
 START:
