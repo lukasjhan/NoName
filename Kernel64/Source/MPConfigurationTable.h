@@ -147,5 +147,6 @@ BOOL kAnalysisMPConfigurationTable( void );
 MPCONFIGRUATIONMANAGER* kGetMPConfigurationManager( void );
 void kPrintMPConfigurationTable( void );
 int kGetProcessorCount( void );
+IOAPICENTRY* kFindIOAPICEntryForISA( void );
 
 #endif /*__MPCONFIGURATIONTABLE__*/
