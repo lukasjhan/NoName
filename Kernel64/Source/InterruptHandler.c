@@ -56,6 +56,8 @@ void kCommonInterruptHandler( int iVectorNumber )
 
     // send EOI
     kSendEOIToPIC( iVectorNumber - PIC_IRQSTARTVECTOR );
+
+    kSendEOIToLocalAPIC();
 }
 
 /**
@@ -85,6 +87,8 @@ void kKeyboardHandler( int iVectorNumber )
 
     // send EOI
     kSendEOIToPIC( iVectorNumber - PIC_IRQSTARTVECTOR );
+
+    kSendEOIToLocalAPIC();
 }
 
 /**
@@ -186,4 +190,6 @@ void kHDDHandler( int iVectorNumber )
         kSetHDDInterruptFlag( FALSE, TRUE );
     
     kSendEOIToPIC( iVectorNumber - PIC_IRQSTARTVECTOR );
+
+    kSendEOIToLocalAPIC();
 }
