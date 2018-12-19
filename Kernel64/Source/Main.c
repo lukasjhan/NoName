@@ -121,17 +121,30 @@ void MainForApplicationProcessor( void )
     QWORD qwTickCount;
 
     kLoadGDTR( GDTR_STARTADDRESS );
+
     kLoadTR( GDT_TSSSEGMENT + ( kGetAPICID() * sizeof( GDTENTRY16 ) ) );
+
     kLoadIDTR( IDTR_STARTADDRESS );
+    
+    kEnableSoftwareLocalAPIC();
 
+    kSetTaskPriority( 0 );
+
+    kInitializeLocalVectorTable();
+
+    kEnableInterrupt();    
+
+    kPrintf( "Application Processor[APIC ID: %d] Is Activated\n", kGetAPICID() );
+    
     qwTickCount = kGetTickCount();
-
+    
     while ( 1 )
     {
         if ( kGetTickCount() - qwTickCount > 1000 )
         {
             qwTickCount = kGetTickCount();
-            kPrintf( "Application Processor[APIC ID: %d] Is Activated\n", kGetAPICID() );
+            
+            // kPrintf( "Application Processor[APIC ID: %d] Is Activated\n", kGetAPICID() );
         }
     }
 }
