@@ -197,29 +197,29 @@ void kTimerHandler( int iVectorNumber )
     char vcBuffer[]                     = "[INT:  , ]";
     static int g_iTimerInterruptCount   = 0;
     int iIRQ;
+    BYTE bCurrentAPICID;
 
-    vcBuffer[ 5 ]          = '0' + iVectorNumber / 10;
-    vcBuffer[ 6 ]          = '0' + iVectorNumber % 10;
-    vcBuffer[ 8 ]          = '0' + g_iTimerInterruptCount;
+    vcBuffer[ 5 ] = '0' + iVectorNumber / 10;
+    vcBuffer[ 6 ] = '0' + iVectorNumber % 10;
+    vcBuffer[ 8 ] = '0' + g_iTimerInterruptCount;
     g_iTimerInterruptCount = ( g_iTimerInterruptCount + 1 ) % 10;
-
     kPrintStringXY( 70, 0, vcBuffer );
-    
     iIRQ = iVectorNumber - PIC_IRQSTARTVECTOR;
 
     kSendEOI( iIRQ );
     
     kIncreaseInterruptCount( iIRQ );
 
-    if( kGetAPICID() == 0 )
+    bCurrentAPICID = kGetAPICID();
+    if( bCurrentAPICID == 0 )
     {
         g_qwTickCount++;
-    
-        kDecreaseProcessorTime();
-        if( kIsProcessorTimeExpired() == TRUE )
-        {
-            kScheduleInInterrupt();
-        }
+    }
+
+    kDecreaseProcessorTime( bCurrentAPICID );
+    if( kIsProcessorTimeExpired( bCurrentAPICID ) == TRUE )
+    {
+        kScheduleInInterrupt();
     }
 }
 
@@ -233,6 +233,7 @@ void kDeviceNotAvailableHandler( int iVectorNumber )
 {
     TCB* pstFPUTask, * pstCurrentTask;
     QWORD qwLastFPUTaskID;
+    BYTE bCurrentAPICID;
 
     char vcBuffer[] = "[EXC:  , ]";
     static int g_iFPUInterruptCount = 0;
@@ -243,31 +244,37 @@ void kDeviceNotAvailableHandler( int iVectorNumber )
     g_iFPUInterruptCount = ( g_iFPUInterruptCount + 1 ) % 10;
     kPrintStringXY( 0, 0, vcBuffer );    
     
+    bCurrentAPICID = kGetAPICID();
+    
     kClearTS();
 
-    qwLastFPUTaskID = kGetLastFPUUsedTaskID();
-    pstCurrentTask = kGetRunningTask();
+    qwLastFPUTaskID = kGetLastFPUUsedTaskID( bCurrentAPICID );
+    pstCurrentTask = kGetRunningTask( bCurrentAPICID );
     
-    if ( qwLastFPUTaskID == pstCurrentTask->stLink.qwID )
+    if( qwLastFPUTaskID == pstCurrentTask->stLink.qwID )
+    {
         return ;
-    
-    else if ( qwLastFPUTaskID != TASK_INVALIDID )
+    }
+    else if( qwLastFPUTaskID != TASK_INVALIDID )
     {
         pstFPUTask = kGetTCBInTCBPool( GETTCBOFFSET( qwLastFPUTaskID ) );
-        if ( ( pstFPUTask != NULL ) && ( pstFPUTask->stLink.qwID == qwLastFPUTaskID ) )
+        if( ( pstFPUTask != NULL ) && ( pstFPUTask->stLink.qwID == qwLastFPUTaskID ) )
+        {
             kSaveFPUContext( pstFPUTask->vqwFPUContext );
-        
+        }
     }
-    
-    if ( pstCurrentTask->bFPUUsed == FALSE )
+
+    if( pstCurrentTask->bFPUUsed == FALSE )
     {
         kInitializeFPU();
         pstCurrentTask->bFPUUsed = TRUE;
     }
     else
+    {
         kLoadFPUContext( pstCurrentTask->vqwFPUContext );
+    }
     
-    kSetLastFPUUsedTaskID( pstCurrentTask->stLink.qwID );
+    kSetLastFPUUsedTaskID( bCurrentAPICID, pstCurrentTask->stLink.qwID );
 }
 
 /**
