@@ -54,22 +54,31 @@ void kInitializeMutex( MUTEX* pstMutex )
  */
 void kLock( MUTEX* pstMutex )
 {
-    // check already locked
+    BYTE bCurrentAPICID;
+    BOOL bInterruptFlag;
+
+    bInterruptFlag = kSetInterruptFlag( FALSE );
+
+    bCurrentAPICID = kGetAPICID();
+    
     if( kTestAndSet(&( pstMutex->bLockFlag ), 0, 1 ) == FALSE )
     {
-        // check lock from me
-        if( pstMutex->qwTaskID == kGetRunningTask()->stLink.qwID ) 
+        if( pstMutex->qwTaskID == kGetRunningTask( bCurrentAPICID )->stLink.qwID ) 
         {
+            kSetInterruptFlag( bInterruptFlag );
             pstMutex->dwLockCount++;
             return ;
         }
         
         while( kTestAndSet( &( pstMutex->bLockFlag ), 0, 1 ) == FALSE )
+        {
             kSchedule();
+        }
     }
        
-    pstMutex->dwLockCount   = 1;
-    pstMutex->qwTaskID      = kGetRunningTask()->stLink.qwID;
+    pstMutex->dwLockCount = 1;
+    pstMutex->qwTaskID = kGetRunningTask( bCurrentAPICID )->stLink.qwID;
+    kSetInterruptFlag( bInterruptFlag );
 }
 
 /**
@@ -80,19 +89,27 @@ void kLock( MUTEX* pstMutex )
  */
 void kUnlock( MUTEX* pstMutex )
 {
-    // not lock from me
-    if ( ( pstMutex->bLockFlag == FALSE ) || ( pstMutex->qwTaskID != kGetRunningTask()->stLink.qwID ) )
-        return ;
+    BOOL bInterruptFlag;
+
+    bInterruptFlag = kSetInterruptFlag( FALSE );
     
-    if ( pstMutex->dwLockCount > 1 )
+    if( ( pstMutex->bLockFlag == FALSE ) || ( pstMutex->qwTaskID != kGetRunningTask( kGetAPICID() )->stLink.qwID ) )
     {
-        pstMutex->dwLockCount--;
+        kSetInterruptFlag( bInterruptFlag );
         return ;
     }
     
-    pstMutex->qwTaskID      = TASK_INVALIDID;
-    pstMutex->dwLockCount   = 0;
-    pstMutex->bLockFlag     = FALSE;
+    if( pstMutex->dwLockCount > 1 )
+    {
+        pstMutex->dwLockCount--;
+    }
+    else
+    {
+        pstMutex->qwTaskID = TASK_INVALIDID;
+        pstMutex->dwLockCount = 0;
+        pstMutex->bLockFlag = FALSE;
+    }
+    kSetInterruptFlag( bInterruptFlag );
 }
 
 void kInitializeSpinLock( SPINLOCK* pstSpinLock )
