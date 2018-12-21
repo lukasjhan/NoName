@@ -19,24 +19,24 @@ START:
     mov es, ax                  
     
     cmp byte [ es: 0x7C09 ], 0x00       
-    je APPLICATIONPROCESSORSTARTPOINT 
+    je .APPLICATIONPROCESSORSTARTPOINT 
 
     ; A20 gate activate
     mov ax, 0x2401  ; A20 gate activate service setting
     int 0x15        ; BIOS service called
 
-    jc A20GATEERROR ; check A20 gate activation success
-    jmp A20GATESUCCESS
+    jc .A20GATEERROR ; check A20 gate activation success
+    jmp .A20GATESUCCESS
 
-A20GATEERROR:
+.A20GATEERROR:
     ; if error, use system control port
     in al, 0x92     ; read 1 byte from system control port(0x92)
     or al, 0x02     ; A20 gate bit set 1
     and al, 0xFE    ; set bit 0 to 0
     out 0x92, al    ; set system control port
 
-A20GATESUCCESS:
-APPLICATIONPROCESSORSTARTPOINT:
+.A20GATESUCCESS:
+.APPLICATIONPROCESSORSTARTPOINT:
     cli             ; set no interrupts
     lgdt [ GDTR ]   ; load GDT table
 
@@ -65,7 +65,7 @@ PROTECTEDMODE:
     mov ebp, 0xFFFE
 
     cmp byte [ 0x7C09 ], 0x00
-    je APPLICATIONPROCESSORSTARTPOINT
+    je .APPLICATIONPROCESSORSTARTPOINT
 
     ; print message on screen
     push ( SWITCHSUCCESSMESSAGE - $$ + 0x10000 )
@@ -99,20 +99,20 @@ PRINTMESSAGE:
 
     mov esi, dword [ ebp + 16 ]
 
-MESSAGELOOP:               
+.MESSAGELOOP:               
     mov cl, byte [ esi ]
 
     cmp cl, 0
-    je MESSAGEEND
+    je .MESSAGEEND
 
     mov byte [ edi + 0xB8000 ], cl
     
     add esi, 1
     add edi, 2
 
-    jmp MESSAGELOOP
+    jmp .MESSAGELOOP
 
-MESSAGEEND:
+.MESSAGEEND:
     pop edx
     pop ecx
     pop eax

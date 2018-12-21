@@ -288,6 +288,7 @@ void kHDDHandler( int iVectorNumber )
     char vcBuffer[] = "[INT:  , ]";
     static int g_iHDDInterruptCount = 0;
     BYTE bTemp;
+    int iIRQ;
 
     vcBuffer[ 5 ] = '0' + iVectorNumber / 10;
     vcBuffer[ 6 ] = '0' + iVectorNumber % 10;

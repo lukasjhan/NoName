@@ -9,6 +9,7 @@
 #define __INTERRUPTHANDLER_H__
 
 #include "Types.h"
+#include "MultiProcessor.h"
 
 #define INTERRUPT_MAXVECTORCOUNT            16
 #define INTERRUPT_LOADBALANCINGDIVIDOR      10
