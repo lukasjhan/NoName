@@ -22,17 +22,18 @@ OS for x86-64 system
 * multitask
 * process & thread
 * HDD driver
-
-## Working
-
 * File System
-
-## TO-DO
-
 * C standard functions
 * cache & ram disk
 * multi-core
 * symentic I/O mode
+
+## Working
+
+
+
+## TO-DO
+
 * GUI & mouse driver
 * system call
 * user level
