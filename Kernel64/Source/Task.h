@@ -10,6 +10,7 @@
 
 #include "Types.h"
 #include "List.h"
+#include "Synchronization.h"
 
 #define TASK_REGISTERCOUNT     ( 5 + 19 )
 #define TASK_REGISTERSIZE       8
@@ -70,6 +71,7 @@
 
 #define GETTCBFROMTHREADLINK( x )   ( TCB* ) ( ( QWORD ) ( x ) - offsetof( TCB, stThreadLink ) )
 
+#define TASK_LOADBALANCINGID    0xFF
 
 #pragma pack( push, 1 )
 
@@ -83,31 +85,35 @@ typedef struct kTaskControlBlockStruct
     LISTLINK stLink;
     
     QWORD qwFlags;
-
-    // process
+    
     void* pvMemoryAddress;
     QWORD qwMemorySize;
 
-    // thread
     LISTLINK stThreadLink;
+    
     QWORD qwParentProcessID;
     
-    QWORD vqwFPUContext[ 512 / 8 ]; // data must be add below this line
-    // child thread list
+    QWORD vqwFPUContext[ 512 / 8 ]; 
+
     LIST stChildThreadList;
 
     CONTEXT stContext;
-
     void* pvStackAddress;
     QWORD qwStackSize;
-
+    
     BOOL bFPUUsed;
-    // padding for align 16byte
-    char vcPadding[ 11 ];
+    
+    BYTE bAffinity; 
+    
+    BYTE bAPICID;
+    
+    char vcPadding[ 9 ];
 } TCB;
 
 typedef struct kTCBPoolManagerStruct
 {
+    SPINLOCK stSpinLock;
+    
     TCB* pstStartAddress;
     int iMaxCount;
     int iUseCount;
@@ -117,60 +123,64 @@ typedef struct kTCBPoolManagerStruct
 
 typedef struct kSchedulerStruct
 {
-    // current running task
+    SPINLOCK stSpinLock;
+    
     TCB* pstRunningTask;
-    // task using processor time
+    
     int iProcessorTime;
-    // ready task list
+    
     LIST vstReadyList[ TASK_MAXREADYLISTCOUNT ];
-    // exit read task
+
     LIST stWaitList;
-    // exe count list
+    
     int viExecuteCount[ TASK_MAXREADYLISTCOUNT ];
-    // processor load
+    
     QWORD qwProcessorLoad;
-    // idle task processor time
+    
     QWORD qwSpendProcessorTimeInIdleTask;
-    // last task id using FPU
+    
     QWORD qwLastFPUUsedTaskID;
+    
+    BOOL bUseLoadBalancing;
 } SCHEDULER;
 
 #pragma pack( pop )
 
-// TASK
 static void kInitializeTCBPool( void );
 static TCB* kAllocateTCB( void );
 static void kFreeTCB( QWORD qwID );
-TCB* kCreateTask( QWORD qwFlags, void* pvMemoryAddress, QWORD qwMemorySize, QWORD qwEntryPointAddress );
+TCB* kCreateTask( QWORD qwFlags, void* pvMemoryAddress, QWORD qwMemorySize, QWORD qwEntryPointAddress, BYTE bAffinity );
 static void kSetUpTask( TCB* pstTCB, QWORD qwFlags, QWORD qwEntryPointAddress, void* pvStackAddress, QWORD qwStackSize );
 
-// Scheduler
 void kInitializeScheduler( void );
-void kSetRunningTask( TCB* pstTask );
-TCB* kGetRunningTask( void );
-static TCB* kGetNextTaskToRun( void );
-static BOOL kAddTaskToReadyList( TCB* pstTask );
-void kSchedule( void );
+void kSetRunningTask( BYTE bAPICID, TCB* pstTask );
+TCB* kGetRunningTask( BYTE bAPICID );
+static TCB* kGetNextTaskToRun( BYTE bAPICID );
+static BOOL kAddTaskToReadyList( BYTE bAPICID, TCB* pstTask );
+BOOL kSchedule( void );
 BOOL kScheduleInInterrupt( void );
-void kDecreaseProcessorTime( void );
-BOOL kIsProcessorTimeExpired( void );
-static TCB* kRemoveTaskFromReadyList( QWORD qwTaskID );
+void kDecreaseProcessorTime( BYTE bAPICID );
+BOOL kIsProcessorTimeExpired( BYTE bAPICID );
+static TCB* kRemoveTaskFromReadyList( BYTE bAPICID, QWORD qwTaskID );
+static BOOL kFindSchedulerOfTaskAndLock( QWORD qwTaskID, BYTE* pbAPICID );
 BOOL kChangePriority( QWORD qwID, BYTE bPriority );
 BOOL kEndTask( QWORD qwTaskID );
 void kExitTask( void );
-int kGetReadyTaskCount( void );
-int kGetTaskCount( void );
+int kGetReadyTaskCount( BYTE bAPICID );
+int kGetTaskCount( BYTE bAPICID );
 TCB* kGetTCBInTCBPool( int iOffset );
 BOOL kIsTaskExist( QWORD qwID );
-QWORD kGetProcessorLoad( void );
+QWORD kGetProcessorLoad( BYTE bAPICID );
 static TCB* kGetProcessByThread( TCB* pstThread );
+void kAddTaskToSchedulerWithLoadBalancing( TCB* pstTask );
+static BYTE kFindSchedulerOfMinumumTaskCount( const TCB* pstTask );
+BYTE kSetTaskLoadBalancing( BYTE bAPICID, BOOL bUseLoadBalancing );
+BOOL kChangeProcessorAffinity( QWORD qwTaskID, BYTE bAffinity );
 
-// Idle Task
 void kIdleTask( void );
-void kHaltProcessorByLoad( void );
+void kHaltProcessorByLoad( BYTE bAPICID );
 
-// FPU
-QWORD kGetLastFPUUsedTaskID( void );
-void kSetLastFPUUsedTaskID( QWORD qwTaskID );
+QWORD kGetLastFPUUsedTaskID( BYTE bAPICID );
+void kSetLastFPUUsedTaskID( BYTE bAPICID, QWORD qwTaskID );
 
 #endif /*__TASK_H__*/

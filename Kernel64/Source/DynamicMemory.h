@@ -9,6 +9,7 @@
 #define __DYNAMICMEMORY_H__
 
 #include "Types.h"
+#include "Synchronization.h"
 
 // start address of dynamic memory
 #define DYNAMICMEMORY_START_ADDRESS     ( ( TASK_STACKPOOLADDRESS + ( TASK_STACKSIZE * TASK_MAXCOUNT ) + 0xfffff ) & 0xfffffffffff00000 )
@@ -26,6 +27,8 @@ typedef struct kBitmapStruct
 
 typedef struct kDynamicMemoryManagerStruct
 {
+    SPINLOCK stSpinLock;
+
     int iMaxLevelCount;
     int iBlockCountOfSmallestBlock;
     QWORD qwUsedSize;

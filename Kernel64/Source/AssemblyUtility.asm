@@ -12,8 +12,9 @@ global kInPortByte, kOutPortByte, kInPortWord, kOutPortWord
 global kLoadGDTR, kLoadTR, kLoadIDTR
 global kEnableInterrupt, kDisableInterrupt, kReadRFLAGS
 global kReadTSC
-global kSwitchContext, kHlt, kTestAndSet
+global kSwitchContext, kHlt, kTestAndSet, kPause
 global kInitializeFPU, kSaveFPUContext, kLoadFPUContext, kSetTS, kClearTS
+global kEnableGlobalLocalAPIC
 
 ; function name : kInPortByte
 ; parameter     : port number
@@ -302,3 +303,26 @@ kSetTS:
 kClearTS:
     clts
     ret    
+
+; function name : kEnableGlobalLocalAPIC
+; parameter     : NONE
+; brief         : enable local APIC
+kEnableGlobalLocalAPIC:
+    push rax            
+    push rcx
+    push rdx
+    
+    mov rcx, 27
+    rdmsr               
+            
+    or eax, 0x0800 
+    wrmsr        
+        
+    pop rdx     
+    pop rcx
+    pop rax
+    ret
+
+kPause:
+    pause
+    ret

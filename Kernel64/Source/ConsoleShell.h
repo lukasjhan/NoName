@@ -1,6 +1,6 @@
 /* filename          /Kernel64/Source/ConsoleShell.h
  * date              2018.11.23
- * last edit date    2018.12.06
+ * last edit date    2018.12.18
  * author            NO.00[UNKNOWN]
  * brief             header file for ConsoleShell.c
 */
@@ -79,5 +79,13 @@ static void kTestFileIO( const char* pcParameterBuffer );
 static void kFlushCache( const char* pcParameterBuffer );
 static void kTestPerformance( const char* pcParameterBuffer );
 static void kDownloadFile( const char* pcParameterBuffer );
+static void kShowMPConfigurationTable( const char* pcParameterBuffer );
+static void kStartApplicationProcessor( const char* pcParameterBuffer );
+static void kStartSymmetricIOMode( const char* pcParameterBuffer );
+static void kShowIRQINTINMappingTable( const char* pcParameterBuffer );
+static void kShowInterruptProcessingCount( const char* pcParameterBuffer );
+static void kStartInterruptLoadBalancing( const char* pcParameterBuffer );
+static void kStartTaskLoadBalancing( const char* pcParameterBuffer );
+static void kChangeTaskAffinity( const char* pcParameterBuffer );
 
 #endif /*__CONSOLESHELL_H__*/

@@ -7,18 +7,11 @@
 
 #include "Task.h"
 #include "Descriptor.h"
+#include "MultiProcessor.h"
 
-static SCHEDULER gs_stScheduler;
+static SCHEDULER gs_vstScheduler[ MAXPROCESSORCOUNT ];
 static TCBPOOLMANAGER gs_stTCBPoolManager;
 
-//  TASK
-
-/**
- *  function name : kInitializeTCBPool
- *  parameters    : void
- *  return value  : void
- *  brief         : init taskpool
- */
 static void kInitializeTCBPool( void )
 {
     int i;
@@ -29,26 +22,29 @@ static void kInitializeTCBPool( void )
     kMemSet( TASK_TCBPOOLADDRESS, 0, sizeof( TCB ) * TASK_MAXCOUNT );
 
     for ( i = 0 ; i < TASK_MAXCOUNT ; i++ )
+    {
         gs_stTCBPoolManager.pstStartAddress[ i ].stLink.qwID = i;
+    }
     
     gs_stTCBPoolManager.iMaxCount = TASK_MAXCOUNT;
     gs_stTCBPoolManager.iAllocatedCount = 1;
+    
+    kInitializeSpinLock( &gs_stTCBPoolManager.stSpinLock );
 }
 
-/**
- *  function name : kAllocateTCB
- *  parameters    : void
- *  return value  : TCB*
- *  brief         : allocate TCB
- */
 static TCB* kAllocateTCB( void )
 {
-    TCB*    pstEmptyTCB;
-    int     i;
+    TCB* pstEmptyTCB;
+    int i;
+    
+    kLockForSpinLock( &gs_stTCBPoolManager.stSpinLock );
     
     if ( gs_stTCBPoolManager.iUseCount == gs_stTCBPoolManager.iMaxCount )
+    {
+        kUnlockForSpinLock( &gs_stTCBPoolManager.stSpinLock );
         return NULL;
-    
+    }
+
     for ( i = 0 ; i < gs_stTCBPoolManager.iMaxCount ; i++ )
     {
         if ( ( gs_stTCBPoolManager.pstStartAddress[ i ].stLink.qwID >> 32 ) == 0 )
@@ -63,55 +59,54 @@ static TCB* kAllocateTCB( void )
     gs_stTCBPoolManager.iAllocatedCount++;
 
     if ( gs_stTCBPoolManager.iAllocatedCount == 0 )
+    {
         gs_stTCBPoolManager.iAllocatedCount = 1;
-    
+    }
+
+    kUnlockForSpinLock( &gs_stTCBPoolManager.stSpinLock );
+
     return pstEmptyTCB;
 }
 
-/**
- *  function name : kFreeTCB
- *  parameters    : qwID(QWORD)
- *  return value  : void
- *  brief         : deallocate TCB
- */
 static void kFreeTCB( QWORD qwID )
 {
     int i;
-    // set index
+    
     i = GETTCBOFFSET( qwID );
     
     kMemSet( &( gs_stTCBPoolManager.pstStartAddress[ i ].stContext ), 0, sizeof( CONTEXT ) );
+
+    kLockForSpinLock( &gs_stTCBPoolManager.stSpinLock );
+    
     gs_stTCBPoolManager.pstStartAddress[ i ].stLink.qwID = i;
     
     gs_stTCBPoolManager.iUseCount--;
+
+    kUnlockForSpinLock( &gs_stTCBPoolManager.stSpinLock );
 }
 
-/**
- *  function name : kCreateTask
- *  parameters    : qwFlags(QWORD)
- *                  qwEntryPointAddress(QWORD)
- *  return value  : TCB*
- *  brief         : create task, process, thread
- */
-TCB* kCreateTask( QWORD qwFlags, void* pvMemoryAddress, QWORD qwMemorySize, QWORD qwEntryPointAddress )
+TCB* kCreateTask( QWORD qwFlags, void* pvMemoryAddress, QWORD qwMemorySize, QWORD qwEntryPointAddress, BYTE bAffinity )
 {
-    TCB*    pstTask, * pstProcess;
-    void*   pvStackAddress;
-    BOOL    bPreviousFlag;
+    TCB* pstTask, * pstProcess;
+    void* pvStackAddress;
+    BYTE bCurrentAPICID;
     
-    bPreviousFlag = kLockForSystemData();
+    bCurrentAPICID = kGetAPICID();
+    
     pstTask = kAllocateTCB();
     if ( pstTask == NULL )
     {
-        kUnlockForSystemData( bPreviousFlag );
         return NULL;
     }
 
-    pstProcess = kGetProcessByThread( kGetRunningTask() );
+    kLockForSpinLock( &( gs_vstScheduler[ bCurrentAPICID ].stSpinLock ) );
+    
+    pstProcess = kGetProcessByThread( kGetRunningTask( bCurrentAPICID ) );
+
     if ( pstProcess == NULL )
     {
         kFreeTCB( pstTask->stLink.qwID );
-        kUnlockForSystemData( bPreviousFlag );
+        kUnlockForSpinLock( &( gs_vstScheduler[ bCurrentAPICID ].stSpinLock ) );
         return NULL;
     }
 
@@ -130,41 +125,32 @@ TCB* kCreateTask( QWORD qwFlags, void* pvMemoryAddress, QWORD qwMemorySize, QWOR
         pstTask->qwMemorySize = qwMemorySize;
     }
     
-    pstTask->stThreadLink.qwID = pstTask->stLink.qwID;  
-
-    kUnlockForSystemData( bPreviousFlag );
+    pstTask->stThreadLink.qwID = pstTask->stLink.qwID;
+    kUnlockForSpinLock( &( gs_vstScheduler[ bCurrentAPICID ].stSpinLock ) );
     
     pvStackAddress = ( void* ) ( TASK_STACKPOOLADDRESS + ( TASK_STACKSIZE * GETTCBOFFSET( pstTask->stLink.qwID ) ) );
+    
     kSetUpTask( pstTask, qwFlags, qwEntryPointAddress, pvStackAddress, TASK_STACKSIZE );
 
     kInitializeList( &( pstTask->stChildThreadList ) );
-
-    pstTask->bFPUUsed = FALSE;
-
-    bPreviousFlag = kLockForSystemData();
-    kAddTaskToReadyList( pstTask );
-    kUnlockForSystemData( bPreviousFlag );
     
+    pstTask->bFPUUsed = FALSE;
+    
+    pstTask->bAPICID = bCurrentAPICID;
+    
+    pstTask->bAffinity = bAffinity;
+
+    kAddTaskToSchedulerWithLoadBalancing( pstTask );
     return pstTask;
 }
 
-/**
- *  function name : kSetUpTask
- *  parameters    : pstTCB(TCB*)
- *                  qwFlags(QWORD)
- *                  qwEntryPointAddress(QWORD)
- *                  pvStackAddress(void*)
- *                  qwStackSize(QWORD)
- *  return value  : void
- *  brief         : set up TCB
- */
 static void kSetUpTask( TCB* pstTCB, QWORD qwFlags, QWORD qwEntryPointAddress, void* pvStackAddress, QWORD qwStackSize )
 {
     kMemSet( pstTCB->stContext.vqRegister, 0, sizeof( pstTCB->stContext.vqRegister ) );
-
+    
     pstTCB->stContext.vqRegister[ TASK_RSPOFFSET ] = ( QWORD ) pvStackAddress + qwStackSize - 8;
     pstTCB->stContext.vqRegister[ TASK_RBPOFFSET ] = ( QWORD ) pvStackAddress + qwStackSize - 8;
-
+    
     *( QWORD * ) ( ( QWORD ) pvStackAddress + qwStackSize - 8 ) = ( QWORD ) kExitTask;
 
     pstTCB->stContext.vqRegister[ TASK_CSOFFSET ] = GDT_KERNELCODESEGMENT;
@@ -178,92 +164,87 @@ static void kSetUpTask( TCB* pstTCB, QWORD qwFlags, QWORD qwEntryPointAddress, v
 
     pstTCB->stContext.vqRegister[ TASK_RFLAGSOFFSET ] |= 0x0200;
     
-    pstTCB->pvStackAddress  = pvStackAddress;
-    pstTCB->qwStackSize     = qwStackSize;
-    pstTCB->qwFlags         = qwFlags;
+    pstTCB->pvStackAddress = pvStackAddress;
+    pstTCB->qwStackSize = qwStackSize;
+    pstTCB->qwFlags = qwFlags;
 }
 
-//  Scheduler
-
-/**
- *  function name : kInitializeScheduler
- *  parameters    : void
- *  return value  : void
- *  brief         : init scheduler
- */
 void kInitializeScheduler( void )
 {
     int i;
+    int j;
+    BYTE bCurrentAPICID;
     TCB* pstTask;
+    
+    bCurrentAPICID = kGetAPICID();
 
-    kInitializeTCBPool();
-
-    for ( i = 0 ; i < TASK_MAXREADYLISTCOUNT ; i++ )
+    if( bCurrentAPICID == 0 )
     {
-        kInitializeList( &( gs_stScheduler.vstReadyList[ i ] ) );
-        gs_stScheduler.viExecuteCount[ i ] = 0;
+        kInitializeTCBPool();
+        
+        for ( j = 0 ; j < MAXPROCESSORCOUNT ; j++ )
+        {
+            for ( i = 0 ; i < TASK_MAXREADYLISTCOUNT ; i++ )
+            {
+                kInitializeList( &( gs_vstScheduler[ j ].vstReadyList[ i ] ) );
+                gs_vstScheduler[ j ].viExecuteCount[ i ] = 0;
+            }    
+            kInitializeList( &( gs_vstScheduler[ j ].stWaitList ) );
+
+            kInitializeSpinLock( &( gs_vstScheduler[ j ].stSpinLock ) );
+        }
     }    
-    kInitializeList( &( gs_stScheduler.stWaitList ) );
     
     pstTask = kAllocateTCB();
-    gs_stScheduler.pstRunningTask   = pstTask;
-    pstTask->qwFlags                = TASK_FLAGS_HIGHEST | TASK_FLAGS_PROCESS | TASK_FLAGS_SYSTEM;
-    pstTask->qwParentProcessID      = pstTask->stLink.qwID;
-    pstTask->pvMemoryAddress        = ( void* ) 0x100000;
-    pstTask->qwMemorySize           = 0x500000;
-    pstTask->pvStackAddress         = ( void* ) 0x600000;
-    pstTask->qwStackSize            = 0x100000;
-
-    gs_stScheduler.qwSpendProcessorTimeInIdleTask   = 0;
-    gs_stScheduler.qwProcessorLoad                  = 0;
-
-    gs_stScheduler.qwLastFPUUsedTaskID = TASK_INVALIDID;
-}
-
-/**
- *  function name : kSetRunningTask
- *  parameters    : pstTask(TCB*)
- *  return value  : void
- *  brief         : set running task
- */
-void kSetRunningTask( TCB* pstTask )
-{
-    BOOL bPreviousFlag;
+    gs_vstScheduler[ bCurrentAPICID ].pstRunningTask = pstTask;
     
-    bPreviousFlag = kLockForSystemData();
-
-    gs_stScheduler.pstRunningTask = pstTask;
-
-    kUnlockForSystemData( bPreviousFlag );
+    pstTask->bAPICID = bCurrentAPICID;
+    pstTask->bAffinity = bCurrentAPICID;
+    
+    if( bCurrentAPICID == 0 )
+    {
+        pstTask->qwFlags = TASK_FLAGS_HIGHEST | TASK_FLAGS_PROCESS | TASK_FLAGS_SYSTEM;
+    }
+    else
+    {
+        pstTask->qwFlags = TASK_FLAGS_LOWEST | TASK_FLAGS_PROCESS | TASK_FLAGS_SYSTEM | TASK_FLAGS_IDLE;
+    }
+    
+    pstTask->qwParentProcessID = pstTask->stLink.qwID;
+    pstTask->pvMemoryAddress = ( void* ) 0x100000;
+    pstTask->qwMemorySize = 0x500000;
+    pstTask->pvStackAddress = ( void* ) 0x600000;
+    pstTask->qwStackSize = 0x100000;
+    
+    gs_vstScheduler[ bCurrentAPICID ].qwSpendProcessorTimeInIdleTask = 0;
+    gs_vstScheduler[ bCurrentAPICID ].qwProcessorLoad = 0;
+    
+    gs_vstScheduler[ bCurrentAPICID ].qwLastFPUUsedTaskID = TASK_INVALIDID;
 }
 
-/**
- *  function name : kGetRunningTask
- *  parameters    : void
- *  return value  : TCB*
- *  brief         : return running task
- */
-TCB* kGetRunningTask( void )
+void kSetRunningTask( BYTE bAPICID, TCB* pstTask )
 {
-    BOOL bPreviousFlag;
+    kLockForSpinLock( &( gs_vstScheduler[ bAPICID ].stSpinLock ) );
+
+    gs_vstScheduler[ bAPICID ].pstRunningTask = pstTask;
+
+    kUnlockForSpinLock( &( gs_vstScheduler[ bAPICID ].stSpinLock ) );
+}
+
+TCB* kGetRunningTask( BYTE bAPICID )
+{
     TCB* pstRunningTask;
     
-    bPreviousFlag = kLockForSystemData();
+    kLockForSpinLock( &( gs_vstScheduler[ bAPICID ].stSpinLock ) );
     
-    pstRunningTask = gs_stScheduler.pstRunningTask;
+    pstRunningTask = gs_vstScheduler[ bAPICID ].pstRunningTask;
     
-    kUnlockForSystemData( bPreviousFlag );
+    kUnlockForSpinLock( &( gs_vstScheduler[ bAPICID ].stSpinLock ) );
 
     return pstRunningTask;
 }
 
-/**
- *  function name : kGetNextTaskToRun
- *  parameters    : void
- *  return value  : TCB*
- *  brief         : return next running task
- */
-static TCB* kGetNextTaskToRun( void )
+static TCB* kGetNextTaskToRun( BYTE bAPICID )
 {
     TCB* pstTarget = NULL;
     int iTaskCount, i, j;
@@ -272,501 +253,656 @@ static TCB* kGetNextTaskToRun( void )
     {
         for ( i = 0 ; i < TASK_MAXREADYLISTCOUNT ; i++ )
         {
-            iTaskCount = kGetListCount( &( gs_stScheduler.vstReadyList[ i ] ) );
+            iTaskCount = kGetListCount( &( gs_vstScheduler[ bAPICID ].vstReadyList[ i ] ) );
             
-            if ( gs_stScheduler.viExecuteCount[ i ] < iTaskCount )
+            if ( gs_vstScheduler[ bAPICID ].viExecuteCount[ i ] < iTaskCount )
             {
-                pstTarget = ( TCB* ) kRemoveListFromHeader( &( gs_stScheduler.vstReadyList[ i ] ) );
-                gs_stScheduler.viExecuteCount[ i ]++;
+                pstTarget = ( TCB* ) kRemoveListFromHeader( &( gs_vstScheduler[ bAPICID ].vstReadyList[ i ] ) );
+                gs_vstScheduler[ bAPICID ].viExecuteCount[ i ]++;
                 break;            
             }
             else
-                gs_stScheduler.viExecuteCount[ i ] = 0;
+            {
+                gs_vstScheduler[ bAPICID ].viExecuteCount[ i ] = 0;
+            }
         }
-        // find next task
+        
         if ( pstTarget != NULL )
-            break; 
+        {
+            break;
+        }
     }    
     return pstTarget;
 }
 
-/**
- *  function name : kAddTaskToReadyList
- *  parameters    : pstTask(TCB*)
- *  return value  : BOOL
- *  brief         : add task into list
- */
-static BOOL kAddTaskToReadyList( TCB* pstTask )
+static BOOL kAddTaskToReadyList( BYTE bAPICID, TCB* pstTask )
 {
     BYTE bPriority;
     
     bPriority = GETPRIORITY( pstTask->qwFlags );
-    if ( bPriority == TASK_FLAGS_WAIT )
+    if( bPriority == TASK_FLAGS_WAIT )
     {
-        kAddListToTail( &( gs_stScheduler.stWaitList ), pstTask );
+        kAddListToTail( &( gs_vstScheduler[ bAPICID ].stWaitList ), pstTask );
         return TRUE;
     }
-    else if ( bPriority >= TASK_MAXREADYLISTCOUNT )
+    else if( bPriority >= TASK_MAXREADYLISTCOUNT )
+    {
         return FALSE;
+    }
     
-    kAddListToTail( &( gs_stScheduler.vstReadyList[ bPriority ] ), pstTask );
+    kAddListToTail( &( gs_vstScheduler[ bAPICID ].vstReadyList[ bPriority ] ), 
+            pstTask );
     return TRUE;
 }
 
-/**
- *  function name : kRemoveTaskFromReadyList
- *  parameters    : qwTaskID(QWORD)
- *  return value  : TCB*
- *  brief         : remove task in ready list
- */
-static TCB* kRemoveTaskFromReadyList( QWORD qwTaskID )
+static TCB* kRemoveTaskFromReadyList( BYTE bAPICID, QWORD qwTaskID )
 {
     TCB* pstTarget;
     BYTE bPriority;
     
-    // invaild value
-    if ( GETTCBOFFSET( qwTaskID ) >= TASK_MAXCOUNT )
+    if( GETTCBOFFSET( qwTaskID ) >= TASK_MAXCOUNT )
+    {
         return NULL;
+    }
     
     pstTarget = &( gs_stTCBPoolManager.pstStartAddress[ GETTCBOFFSET( qwTaskID ) ] );
-    if ( pstTarget->stLink.qwID != qwTaskID )
+    if( pstTarget->stLink.qwID != qwTaskID )
+    {
         return NULL;
+    }
     
     bPriority = GETPRIORITY( pstTarget->qwFlags );
     if( bPriority >= TASK_MAXREADYLISTCOUNT )
+    {
         return NULL;
-    
-    pstTarget = kRemoveList( &( gs_stScheduler.vstReadyList[ bPriority ]), qwTaskID );
+    }    
+
+    pstTarget = kRemoveList( &( gs_vstScheduler[ bAPICID ].vstReadyList[ bPriority ]), 
+                     qwTaskID );
     return pstTarget;
 }
 
-/**
- *  function name : kChangePriority
- *  parameters    : qwTaskID(QWORD)
- *  return value  : TCB*
- *  brief         : change priority 
- */
+static BOOL kFindSchedulerOfTaskAndLock( QWORD qwTaskID, BYTE* pbAPICID )
+{
+    TCB* pstTarget;
+    BYTE bAPICID;
+    
+    while( 1 )
+    {
+        pstTarget = &( gs_stTCBPoolManager.pstStartAddress[ GETTCBOFFSET( qwTaskID ) ] );
+        if( ( pstTarget == NULL ) || ( pstTarget->stLink.qwID != qwTaskID ) )
+        {
+            return FALSE;
+        }
+    
+        bAPICID = pstTarget->bAPICID;
+        
+        kLockForSpinLock( &( gs_vstScheduler[ bAPICID ].stSpinLock ) );
+
+        pstTarget = &( gs_stTCBPoolManager.pstStartAddress[ GETTCBOFFSET( qwTaskID ) ] );
+        if( pstTarget->bAPICID == bAPICID )
+        {
+            break;
+        }
+        
+        kUnlockForSpinLock( &( gs_vstScheduler[ bAPICID ].stSpinLock ) );
+    }  
+    
+    *pbAPICID = bAPICID;
+    return TRUE;
+}
+
 BOOL kChangePriority( QWORD qwTaskID, BYTE bPriority )
 {
     TCB* pstTarget;
-    BOOL bPreviousFlag;
+    BYTE bAPICID;
     
-    if ( bPriority > TASK_MAXREADYLISTCOUNT )
+    if( bPriority > TASK_MAXREADYLISTCOUNT )
+    {
         return FALSE;
-
-    bPreviousFlag = kLockForSystemData();
-
-    // currently running task
-    pstTarget = gs_stScheduler.pstRunningTask;
-    if ( pstTarget->stLink.qwID == qwTaskID )
+    }
+    
+    if( kFindSchedulerOfTaskAndLock( qwTaskID, &bAPICID ) == FALSE )
+    {
+        return FALSE;
+    }
+    
+    pstTarget = gs_vstScheduler[ bAPICID ].pstRunningTask;
+    if( pstTarget->stLink.qwID == qwTaskID )
+    {
         SETPRIORITY( pstTarget->qwFlags, bPriority );
+    }
     else
     {
-        pstTarget = kRemoveTaskFromReadyList( qwTaskID );
-        if ( pstTarget == NULL )
+        pstTarget = kRemoveTaskFromReadyList( bAPICID, qwTaskID );
+        if( pstTarget == NULL )
         {
             pstTarget = kGetTCBInTCBPool( GETTCBOFFSET( qwTaskID ) );
-            if ( pstTarget != NULL )
-                SETPRIORITY( pstTarget->qwFlags, bPriority ); 
+            if( pstTarget != NULL )
+            {
+                SETPRIORITY( pstTarget->qwFlags, bPriority );
+            }
         }
         else
         {
             SETPRIORITY( pstTarget->qwFlags, bPriority );
-            kAddTaskToReadyList( pstTarget );
+            kAddTaskToReadyList( bAPICID, pstTarget );
         }
     }
-    kUnlockForSystemData( bPreviousFlag );
+    kUnlockForSpinLock( &( gs_vstScheduler[ bAPICID ].stSpinLock ) );
+    
     return TRUE;    
 }
 
-/**
- *  function name : kSchedule
- *  parameters    : void
- *  return value  : void
- *  brief         : schedule function
- *                  DO NOT CALL IT DURING INTERRUPT OR EXCEPTION!!!
- */
-void kSchedule( void )
+BOOL kSchedule( void )
 {
     TCB* pstRunningTask, * pstNextTask;
-    BOOL bPreviousFlag;
+    BOOL bPreviousInterrupt;
+    BYTE bCurrentAPICID;
     
-    if ( kGetReadyTaskCount() < 1 )
-        return ;
-
-    bPreviousFlag = kLockForSystemData();
+    bPreviousInterrupt = kSetInterruptFlag( FALSE );
     
-    pstNextTask = kGetNextTaskToRun();
-
-    if ( pstNextTask == NULL )
+    bCurrentAPICID = kGetAPICID();
+    
+    if( kGetReadyTaskCount( bCurrentAPICID ) < 1 )
     {
-        kUnlockForSystemData( bPreviousFlag );
-        return ;
+        kSetInterruptFlag( bPreviousInterrupt );
+        return FALSE;
     }
     
-    pstRunningTask = gs_stScheduler.pstRunningTask; 
-    gs_stScheduler.pstRunningTask = pstNextTask;
-    
-    if ( ( pstRunningTask->qwFlags & TASK_FLAGS_IDLE ) == TASK_FLAGS_IDLE )
-        gs_stScheduler.qwSpendProcessorTimeInIdleTask += TASK_PROCESSORTIME - gs_stScheduler.iProcessorTime;
+    kLockForSpinLock( &( gs_vstScheduler[ bCurrentAPICID ].stSpinLock ) );
 
-    if ( gs_stScheduler.qwLastFPUUsedTaskID != pstNextTask->stLink.qwID )
-        kSetTS();
-    else
-        kClearTS();
-    
-    gs_stScheduler.iProcessorTime = TASK_PROCESSORTIME;
-    
-    if ( pstRunningTask->qwFlags & TASK_FLAGS_ENDTASK )
+    pstNextTask = kGetNextTaskToRun( bCurrentAPICID );
+    if( pstNextTask == NULL )
     {
-        kAddListToTail( &( gs_stScheduler.stWaitList ), pstRunningTask );
+        kUnlockForSpinLock( &( gs_vstScheduler[ bCurrentAPICID ].stSpinLock ) );
+        kSetInterruptFlag( bPreviousInterrupt );
+        return FALSE;
+    }
+    
+    pstRunningTask = gs_vstScheduler[ bCurrentAPICID ].pstRunningTask; 
+    gs_vstScheduler[ bCurrentAPICID ].pstRunningTask = pstNextTask;
+
+    if( ( pstRunningTask->qwFlags & TASK_FLAGS_IDLE ) == TASK_FLAGS_IDLE )
+    {
+        gs_vstScheduler[ bCurrentAPICID ].qwSpendProcessorTimeInIdleTask += 
+            TASK_PROCESSORTIME - gs_vstScheduler[ bCurrentAPICID ].iProcessorTime;
+    }
+
+    if( gs_vstScheduler[ bCurrentAPICID ].qwLastFPUUsedTaskID != 
+        pstNextTask->stLink.qwID )
+    {
+        kSetTS();
+    }
+    else
+    {
+        kClearTS();
+    }
+
+    if( pstRunningTask->qwFlags & TASK_FLAGS_ENDTASK )
+    {
+        kAddListToTail( &( gs_vstScheduler[ bCurrentAPICID ].stWaitList ), pstRunningTask );
+
+        kUnlockForSpinLock( &( gs_vstScheduler[ bCurrentAPICID ].stSpinLock ) );
+
         kSwitchContext( NULL, &( pstNextTask->stContext ) );
     }
     else
     {
-        kAddTaskToReadyList( pstRunningTask );
+        kAddTaskToReadyList( bCurrentAPICID, pstRunningTask );
+        
+        kUnlockForSpinLock( &( gs_vstScheduler[ bCurrentAPICID ].stSpinLock ) );
+
         kSwitchContext( &( pstRunningTask->stContext ), &( pstNextTask->stContext ) );
     }
 
-    kUnlockForSystemData( bPreviousFlag );
+    gs_vstScheduler[ bCurrentAPICID ].iProcessorTime = TASK_PROCESSORTIME;
+    
+    kSetInterruptFlag( bPreviousInterrupt );
+    return FALSE;
 }
 
-/**
- *  function name : kScheduleInInterrupt
- *  parameters    : void
- *  return value  : BOOL
- *  brief         : when interrupt occur, switching task
- *                  CALL IT DURING INTERRUPT OR EXCEPTION!!!
- */
 BOOL kScheduleInInterrupt( void )
 {
     TCB* pstRunningTask, * pstNextTask;
     char* pcContextAddress;
-    BOOL bPreviousFlag;
-
-    bPreviousFlag = kLockForSystemData();
+    BYTE bCurrentAPICID;
+    QWORD qwISTStartAddress;
+        
+    bCurrentAPICID = kGetAPICID();
     
-    pstNextTask = kGetNextTaskToRun();
-
-    if ( pstNextTask == NULL )
+    kLockForSpinLock( &( gs_vstScheduler[ bCurrentAPICID ].stSpinLock ) );
+        
+    pstNextTask = kGetNextTaskToRun( bCurrentAPICID );
+    if( pstNextTask == NULL )
     {
-        kUnlockForSystemData( bPreviousFlag );
+        kUnlockForSpinLock( &( gs_vstScheduler[ bCurrentAPICID ].stSpinLock ) );
         return FALSE;
     }
     
-    pcContextAddress = ( char* ) IST_STARTADDRESS + IST_SIZE - sizeof( CONTEXT );
+    qwISTStartAddress = IST_STARTADDRESS + IST_SIZE - ( IST_SIZE / MAXPROCESSORCOUNT * bCurrentAPICID );
+    pcContextAddress = ( char* ) qwISTStartAddress - sizeof( CONTEXT );
+    
+    pstRunningTask = gs_vstScheduler[ bCurrentAPICID ].pstRunningTask;
+    gs_vstScheduler[ bCurrentAPICID ].pstRunningTask = pstNextTask;
 
-    // context change
-    pstRunningTask = gs_stScheduler.pstRunningTask;
-    gs_stScheduler.pstRunningTask = pstNextTask;
-
-    // idle task
     if ( ( pstRunningTask->qwFlags & TASK_FLAGS_IDLE ) == TASK_FLAGS_IDLE )
-        gs_stScheduler.qwSpendProcessorTimeInIdleTask += TASK_PROCESSORTIME;
-       
-    // task end flag
-    if ( pstRunningTask->qwFlags & TASK_FLAGS_ENDTASK )
-       kAddListToTail( &( gs_stScheduler.stWaitList ), pstRunningTask );
+    {
+        gs_vstScheduler[ bCurrentAPICID ].qwSpendProcessorTimeInIdleTask += TASK_PROCESSORTIME;
+    }
+    
+    if( pstRunningTask->qwFlags & TASK_FLAGS_ENDTASK )
+    {    
+        kAddListToTail( &( gs_vstScheduler[ bCurrentAPICID ].stWaitList ), 
+                        pstRunningTask );
+    }
     else
     {
         kMemCpy( &( pstRunningTask->stContext ), pcContextAddress, sizeof( CONTEXT ) );
-        kAddTaskToReadyList( pstRunningTask );
     }
-    kUnlockForSystemData( bPreviousFlag );
-
-    if ( gs_stScheduler.qwLastFPUUsedTaskID != pstNextTask->stLink.qwID )
-        kSetTS();  
+    
+    if( gs_vstScheduler[ bCurrentAPICID ].qwLastFPUUsedTaskID != 
+        pstNextTask->stLink.qwID )
+    {
+        kSetTS();
+    }
     else
+    {
         kClearTS();
-
+    }
+    
+    kUnlockForSpinLock( &( gs_vstScheduler[ bCurrentAPICID ].stSpinLock ) );
+    
     kMemCpy( pcContextAddress, &( pstNextTask->stContext ), sizeof( CONTEXT ) );
     
-    gs_stScheduler.iProcessorTime = TASK_PROCESSORTIME;
+    if( ( pstRunningTask->qwFlags & TASK_FLAGS_ENDTASK ) != TASK_FLAGS_ENDTASK )
+    {
+        kAddTaskToSchedulerWithLoadBalancing( pstRunningTask );
+    }    
+    
+    gs_vstScheduler[ bCurrentAPICID ].iProcessorTime = TASK_PROCESSORTIME;
+    
     return TRUE;
 }
 
-/**
- *  function name : kDecreaseProcessorTime
- *  parameters    : void
- *  return value  : void
- *  brief         : decrease processor time
- */
-void kDecreaseProcessorTime( void )
+void kDecreaseProcessorTime( BYTE bAPICID )
 {
-    if ( gs_stScheduler.iProcessorTime > 0 )
-        gs_stScheduler.iProcessorTime--;
+    gs_vstScheduler[ bAPICID ].iProcessorTime--;
 }
 
-/**
- *  function name : kIsProcessorTimeExpired
- *  parameters    : void
- *  return value  : void
- *  brief         : return processor time expired
- */
-BOOL kIsProcessorTimeExpired( void )
+BOOL kIsProcessorTimeExpired( BYTE bAPICID )
 {
-    if ( gs_stScheduler.iProcessorTime <= 0 )
+    if( gs_vstScheduler[ bAPICID ].iProcessorTime <= 0 )
+    {
         return TRUE;
-    
+    }
     return FALSE;
 }
 
-/**
- *  function name : kEndTask
- *  parameters    : qwTaskID(QWORD)
- *  return value  : BOOL
- *  brief         : end task
- */
 BOOL kEndTask( QWORD qwTaskID )
 {
     TCB* pstTarget;
     BYTE bPriority;
-    BOOL bPreviousFlag;
-
-    bPreviousFlag = kLockForSystemData();
+    BYTE bAPICID;
     
-    pstTarget = gs_stScheduler.pstRunningTask;
-    if ( pstTarget->stLink.qwID == qwTaskID )
+    if( kFindSchedulerOfTaskAndLock( qwTaskID, &bAPICID ) == FALSE )
+    {
+        return FALSE;
+    }
+    
+    pstTarget = gs_vstScheduler[ bAPICID ].pstRunningTask;
+    if( pstTarget->stLink.qwID == qwTaskID )
     {
         pstTarget->qwFlags |= TASK_FLAGS_ENDTASK;
         SETPRIORITY( pstTarget->qwFlags, TASK_FLAGS_WAIT );
-
-        kUnlockForSystemData( bPreviousFlag );
         
-        kSchedule();
-
-        // task switched.. NOT RUN
-        while( 1 ) ;
-    }
-    else
-    {
-        pstTarget = kRemoveTaskFromReadyList( qwTaskID );
-        if ( pstTarget == NULL )
+        kUnlockForSpinLock( &( gs_vstScheduler[ bAPICID ].stSpinLock ) );
+        
+        if( kGetAPICID() == bAPICID )
         {
-            pstTarget = kGetTCBInTCBPool( GETTCBOFFSET( qwTaskID ) );
-            if ( pstTarget != NULL )
+            kSchedule();
+            
+            while( 1 ) 
             {
-                pstTarget->qwFlags |= TASK_FLAGS_ENDTASK;
-                SETPRIORITY( pstTarget->qwFlags, TASK_FLAGS_WAIT );
+                ;
             }
-            kUnlockForSystemData( bPreviousFlag );
-            return FALSE;
         }
         
-        pstTarget->qwFlags |= TASK_FLAGS_ENDTASK;
-        SETPRIORITY( pstTarget->qwFlags, TASK_FLAGS_WAIT );
-        kAddListToTail( &( gs_stScheduler.stWaitList ), pstTarget );
+        return TRUE;
     }
-    kUnlockForSystemData( bPreviousFlag );
+
+    pstTarget = kRemoveTaskFromReadyList( bAPICID, qwTaskID );
+    if( pstTarget == NULL )
+    {
+        pstTarget = kGetTCBInTCBPool( GETTCBOFFSET( qwTaskID ) );
+        if( pstTarget != NULL )
+        {
+            pstTarget->qwFlags |= TASK_FLAGS_ENDTASK;
+            SETPRIORITY( pstTarget->qwFlags, TASK_FLAGS_WAIT );
+        }
+        
+        kUnlockForSpinLock( &( gs_vstScheduler[ bAPICID ].stSpinLock ) );
+        return TRUE;
+    }
+    
+    pstTarget->qwFlags |= TASK_FLAGS_ENDTASK;
+    SETPRIORITY( pstTarget->qwFlags, TASK_FLAGS_WAIT );
+    kAddListToTail( &( gs_vstScheduler[ bAPICID ].stWaitList ), pstTarget );
+    
+    kUnlockForSpinLock( &( gs_vstScheduler[ bAPICID ].stSpinLock ) );
     return TRUE;
 }
 
-/**
- *  function name : kExitTask
- *  parameters    : void
- *  return value  : void
- *  brief         : exit task
- */
 void kExitTask( void )
 {
-    kEndTask( gs_stScheduler.pstRunningTask->stLink.qwID );
+    kEndTask( gs_vstScheduler[ kGetAPICID() ].pstRunningTask->stLink.qwID );
 }
 
-/**
- *  function name : kGetReadyTaskCount
- *  parameters    : void
- *  return value  : int
- *  brief         : return task number of readyQueue
- */
-int kGetReadyTaskCount( void )
+int kGetReadyTaskCount( BYTE bAPICID )
 {
     int iTotalCount = 0;
     int i;
-    BOOL bPreviousFlag;
 
-    bPreviousFlag = kLockForSystemData();
+    kLockForSpinLock( &( gs_vstScheduler[ bAPICID ].stSpinLock ) );
+
+    for( i = 0 ; i < TASK_MAXREADYLISTCOUNT ; i++ )
+    {
+        iTotalCount += kGetListCount( &( gs_vstScheduler[ bAPICID ].
+                vstReadyList[ i ] ) );
+    }
     
-    for ( i = 0 ; i < TASK_MAXREADYLISTCOUNT ; i++ )
-        iTotalCount += kGetListCount( &( gs_stScheduler.vstReadyList[ i ] ) );
-    
-    kUnlockForSystemData( bPreviousFlag );
+    kUnlockForSpinLock( &( gs_vstScheduler[ bAPICID ].stSpinLock ) );
     return iTotalCount ;
 }
 
-/**
- *  function name : kGetTaskCount
- *  parameters    : void
- *  return value  : int
- *  brief         : return number of tasks
- */
-int kGetTaskCount( void )
+int kGetTaskCount( BYTE bAPICID )
 {
     int iTotalCount;
-    BOOL bPreviousFlag;
     
-    iTotalCount = kGetReadyTaskCount();
+    iTotalCount = kGetReadyTaskCount( bAPICID );
+    
+    kLockForSpinLock( &( gs_vstScheduler[ bAPICID ].stSpinLock ) );
+    
+    iTotalCount += kGetListCount( &( gs_vstScheduler[ bAPICID ].stWaitList ) ) + 1;
 
-    bPreviousFlag = kLockForSystemData();
-    iTotalCount += kGetListCount( &( gs_stScheduler.stWaitList ) ) + 1;
-
-    kUnlockForSystemData( bPreviousFlag );
+    kUnlockForSpinLock( &( gs_vstScheduler[ bAPICID ].stSpinLock ) );
     return iTotalCount;
 }
 
-/**
- *  function name : kGetTCBInTCBPool
- *  parameters    : iOffset(int)
- *  return value  : TCB*
- *  brief         : return offset's TCB
- */
 TCB* kGetTCBInTCBPool( int iOffset )
 {
-    if ( ( iOffset < -1 ) || ( iOffset > TASK_MAXCOUNT ) )
+    if( ( iOffset < -1 ) && ( iOffset > TASK_MAXCOUNT ) )
+    {
         return NULL;
+    }
     
     return &( gs_stTCBPoolManager.pstStartAddress[ iOffset ] );
 }
 
-/**
- *  function name : kIsTaskExist
- *  parameters    : qwID(QWORD)
- *  return value  : BOOL
- *  brief         : check task
- */
 BOOL kIsTaskExist( QWORD qwID )
 {
     TCB* pstTCB;
     
     pstTCB = kGetTCBInTCBPool( GETTCBOFFSET( qwID ) );
-
-    if ( ( pstTCB == NULL ) || ( pstTCB->stLink.qwID != qwID ) )
+    if( ( pstTCB == NULL ) || ( pstTCB->stLink.qwID != qwID ) )
+    {
         return FALSE;
-
+    }
     return TRUE;
 }
 
-/**
- *  function name : kGetProcessorLoad
- *  parameters    : void
- *  return value  : QWORD
- *  brief         : return load rate of cpu
- */
-QWORD kGetProcessorLoad( void )
+QWORD kGetProcessorLoad( BYTE bAPICID )
 {
-    return gs_stScheduler.qwProcessorLoad;
+    return gs_vstScheduler[ bAPICID ].qwProcessorLoad;
 }
 
-/**
- *  function name : kGetProcessByThread
- *  parameters    : pstThread(TCB*)
- *  return value  : TCB*
- *  brief         : return thread's process
- */
 static TCB* kGetProcessByThread( TCB* pstThread )
 {
     TCB* pstProcess;
     
-    if ( pstThread->qwFlags & TASK_FLAGS_PROCESS )
+    if( pstThread->qwFlags & TASK_FLAGS_PROCESS )
+    {
         return pstThread;
+    }
     
     pstProcess = kGetTCBInTCBPool( GETTCBOFFSET( pstThread->qwParentProcessID ) );
 
-    if ( ( pstProcess == NULL ) || ( pstProcess->stLink.qwID != pstThread->qwParentProcessID ) )
+    if( ( pstProcess == NULL ) || ( pstProcess->stLink.qwID != pstThread->qwParentProcessID ) )
+    {
         return NULL;
+    }
     
     return pstProcess;
 }
 
-//  IDLE TASK
+void kAddTaskToSchedulerWithLoadBalancing( TCB* pstTask )
+{
+    BYTE bCurrentAPICID;
+    BYTE bTargetAPICID;
+    
+    bCurrentAPICID = pstTask->bAPICID;
+    
+    if( ( gs_vstScheduler[ bCurrentAPICID ].bUseLoadBalancing == TRUE ) && ( pstTask->bAffinity == TASK_LOADBALANCINGID ) )
+    {
+        bTargetAPICID = kFindSchedulerOfMinumumTaskCount( pstTask );
+    }
+    else if( ( pstTask->bAffinity != bCurrentAPICID ) &&
+             ( pstTask->bAffinity != TASK_LOADBALANCINGID ) )
+    {
+        bTargetAPICID = pstTask->bAffinity;
+    }
+    else
+    {
+        bTargetAPICID = bCurrentAPICID;
+    }
+    
+    kLockForSpinLock( &( gs_vstScheduler[ bCurrentAPICID ].stSpinLock ) );
+    if( ( bCurrentAPICID != bTargetAPICID ) && ( pstTask->stLink.qwID == gs_vstScheduler[ bCurrentAPICID ].qwLastFPUUsedTaskID ) )
+    {
+        kClearTS();
+        kSaveFPUContext( pstTask->vqwFPUContext );
+        gs_vstScheduler[ bCurrentAPICID ].qwLastFPUUsedTaskID = TASK_INVALIDID;
+    }
+    kUnlockForSpinLock( &( gs_vstScheduler[ bCurrentAPICID ].stSpinLock ) );
 
-/**
- *  function name : kIdleTask
- *  parameters    : void
- *  return value  : void
- *  brief         : manage removing task
- */
+    kLockForSpinLock( &( gs_vstScheduler[ bTargetAPICID ].stSpinLock ) );    
+ 
+    pstTask->bAPICID = bTargetAPICID;
+    kAddTaskToReadyList( bTargetAPICID, pstTask );
+    
+    kUnlockForSpinLock( &( gs_vstScheduler[ bTargetAPICID ].stSpinLock ) );
+}
+
+static BYTE kFindSchedulerOfMinumumTaskCount( const TCB* pstTask )
+{
+    BYTE bPriority;
+    BYTE i;
+    int iCurrentTaskCount;
+    int iMinTaskCount;
+    BYTE bMinCoreIndex;
+    int iTempTaskCount;
+    int iProcessorCount;
+    
+    iProcessorCount = kGetProcessorCount();
+    
+    if( iProcessorCount == 1 )
+    {
+        return pstTask->bAPICID;
+    }
+    
+    bPriority = GETPRIORITY( pstTask->qwFlags );
+
+    iCurrentTaskCount = kGetListCount( &( gs_vstScheduler[ pstTask->bAPICID ].
+            vstReadyList[ bPriority ] ) );
+    
+    iMinTaskCount = TASK_MAXCOUNT;
+    bMinCoreIndex = pstTask->bAPICID;
+    for( i = 0 ; i < iProcessorCount ; i++ )
+    {
+        if( i == pstTask->bAPICID )
+        {
+            continue;
+        }
+        
+        iTempTaskCount = kGetListCount( &( gs_vstScheduler[ i ].vstReadyList[ bPriority ] ) );
+        
+        if( ( iTempTaskCount + 2 <= iCurrentTaskCount ) &&
+            ( iTempTaskCount < iMinTaskCount ) )
+        {
+            bMinCoreIndex = i;
+            iMinTaskCount = iTempTaskCount;
+        }
+    }
+    
+    return bMinCoreIndex;
+}
+
+BYTE kSetTaskLoadBalancing( BYTE bAPICID, BOOL bUseLoadBalancing )
+{
+    gs_vstScheduler[ bAPICID ].bUseLoadBalancing = bUseLoadBalancing;
+}
+
+BOOL kChangeProcessorAffinity( QWORD qwTaskID, BYTE bAffinity )
+{
+    TCB* pstTarget;
+    BYTE bAPICID;
+    
+    if( kFindSchedulerOfTaskAndLock( qwTaskID, &bAPICID ) == FALSE )
+    {
+        return FALSE;
+    }
+    
+    pstTarget = gs_vstScheduler[ bAPICID ].pstRunningTask;
+    if( pstTarget->stLink.qwID == qwTaskID )
+    {
+        pstTarget->bAffinity = bAffinity;
+
+        kUnlockForSpinLock( &( gs_vstScheduler[ bAPICID ].stSpinLock ) );
+    }
+    else
+    {
+        pstTarget = kRemoveTaskFromReadyList( bAPICID, qwTaskID );
+        if( pstTarget == NULL )
+        {
+            pstTarget = kGetTCBInTCBPool( GETTCBOFFSET( qwTaskID ) );
+            if( pstTarget != NULL )
+            {
+                pstTarget->bAffinity = bAffinity;
+            }
+        }
+        else
+        {
+            pstTarget->bAffinity = bAffinity;
+        }
+
+        kUnlockForSpinLock( &( gs_vstScheduler[ bAPICID ].stSpinLock ) );
+
+        kAddTaskToSchedulerWithLoadBalancing( pstTarget );
+    }
+    
+    return TRUE;
+}
+
 void kIdleTask( void )
 {
-    TCB*    pstTask, * pstChildThread, * pstProcess;
-    QWORD   qwLastMeasureTickCount, qwLastSpendTickInIdleTask;
-    QWORD   qwCurrentMeasureTickCount, qwCurrentSpendTickInIdleTask;
-    BOOL    bPreviousFlag;
-    int     i, iCount;
-    QWORD   qwTaskID;
-    void*   pstThreadLink;
+    TCB* pstTask, * pstChildThread, * pstProcess;
+    QWORD qwLastMeasureTickCount, qwLastSpendTickInIdleTask;
+    QWORD qwCurrentMeasureTickCount, qwCurrentSpendTickInIdleTask;
+    QWORD qwTaskID, qwChildThreadID;
+    int i, iCount;
+    void* pstThreadLink;
+    BYTE bCurrentAPICID;
+    BYTE bProcessAPICID;
     
-    qwLastSpendTickInIdleTask = gs_stScheduler.qwSpendProcessorTimeInIdleTask;
+    bCurrentAPICID = kGetAPICID();
+    
+    qwLastSpendTickInIdleTask = gs_vstScheduler[ bCurrentAPICID ].qwSpendProcessorTimeInIdleTask;
     qwLastMeasureTickCount = kGetTickCount();
     
-    while ( 1 )
+    while( 1 )
     {
         qwCurrentMeasureTickCount = kGetTickCount();
-        qwCurrentSpendTickInIdleTask = gs_stScheduler.qwSpendProcessorTimeInIdleTask;
+        qwCurrentSpendTickInIdleTask = gs_vstScheduler[ bCurrentAPICID ].qwSpendProcessorTimeInIdleTask;
         
-        // cal cpu rate
-        if ( qwCurrentMeasureTickCount - qwLastMeasureTickCount == 0 )
-            gs_stScheduler.qwProcessorLoad = 0;
+        if( qwCurrentMeasureTickCount - qwLastMeasureTickCount == 0 )
+        {
+            gs_vstScheduler[ bCurrentAPICID ].qwProcessorLoad = 0;
+        }
         else
-            gs_stScheduler.qwProcessorLoad = 100 - ( qwCurrentSpendTickInIdleTask - qwLastSpendTickInIdleTask ) * 100 /( qwCurrentMeasureTickCount - qwLastMeasureTickCount );
+        {
+            gs_vstScheduler[ bCurrentAPICID ].qwProcessorLoad = 100 - ( qwCurrentSpendTickInIdleTask - qwLastSpendTickInIdleTask ) * 100 /( qwCurrentMeasureTickCount - qwLastMeasureTickCount );
+        }
         
         qwLastMeasureTickCount = qwCurrentMeasureTickCount;
         qwLastSpendTickInIdleTask = qwCurrentSpendTickInIdleTask;
 
-        kHaltProcessorByLoad();
+        kHaltProcessorByLoad( bCurrentAPICID );
         
-        if ( kGetListCount( &( gs_stScheduler.stWaitList ) ) >= 0 )
+        if( kGetListCount( &( gs_vstScheduler[ bCurrentAPICID ].stWaitList ) ) > 0 )
         {
-            while ( 1 )
+            while( 1 )
             {
-                bPreviousFlag = kLockForSystemData();
-                pstTask = kRemoveListFromHeader( &( gs_stScheduler.stWaitList ) );
-
-                if ( pstTask == NULL )
-                {   
-                    kUnlockForSystemData( bPreviousFlag );
+                kLockForSpinLock( &( gs_vstScheduler[ bCurrentAPICID ].stSpinLock ) );
+                pstTask = kRemoveListFromHeader( &( gs_vstScheduler[ bCurrentAPICID ].stWaitList ) );
+                kUnlockForSpinLock( &( gs_vstScheduler[ bCurrentAPICID ].stSpinLock ) );
+                
+                if( pstTask == NULL )
+                {
                     break;
                 }
-
-                if ( pstTask->qwFlags & TASK_FLAGS_PROCESS )
+                
+                if( pstTask->qwFlags & TASK_FLAGS_PROCESS )
                 {
                     iCount = kGetListCount( &( pstTask->stChildThreadList ) );
-
-                    for ( i = 0 ; i < iCount ; i++ )
+                    for( i = 0 ; i < iCount ; i++ )
                     {
+                        kLockForSpinLock( &( gs_vstScheduler[ bCurrentAPICID ].stSpinLock ) );
                         pstThreadLink = ( TCB* ) kRemoveListFromHeader( &( pstTask->stChildThreadList ) );
-
-                        if ( pstThreadLink == NULL )
+                        if( pstThreadLink == NULL )
+                        {
+                            kUnlockForSpinLock( &( gs_vstScheduler[ bCurrentAPICID ].stSpinLock ) );
                             break;
+                        }
                         
-                        pstChildThread = GETTCBFROMTHREADLINK( pstThreadLink );
+                        pstChildThread = GETTCBFROMTHREADLINK( pstThreadLink );                        
+
                         kAddListToTail( &( pstTask->stChildThreadList ), &( pstChildThread->stThreadLink ) );
-                        kEndTask( pstChildThread->stLink.qwID );
+                        qwChildThreadID = pstChildThread->stLink.qwID;
+                        kUnlockForSpinLock( &( gs_vstScheduler[ bCurrentAPICID ].stSpinLock ) );
+                        
+                        kEndTask( qwChildThreadID );
                     }
                     
                     if ( kGetListCount( &( pstTask->stChildThreadList ) ) > 0 )
                     {
-                        kAddListToTail( &( gs_stScheduler.stWaitList ), pstTask );
-
-                        kUnlockForSystemData( bPreviousFlag );
+                        kLockForSpinLock( &( gs_vstScheduler[ bCurrentAPICID ].stSpinLock ) );
+                        kAddListToTail( &( gs_vstScheduler[ bCurrentAPICID ].stWaitList ), pstTask );
+                        kUnlockForSpinLock( &( gs_vstScheduler[ bCurrentAPICID ].stSpinLock ) );
                         continue;
                     }
                     else
                     {
-                        // TODO: MEMORY MANAGE
+                        // TODO
                     }
                 }                
-                else if ( pstTask->qwFlags & TASK_FLAGS_THREAD )
+                else if( pstTask->qwFlags & TASK_FLAGS_THREAD )
                 {
                     pstProcess = kGetProcessByThread( pstTask );
-                    if ( pstProcess != NULL )
-                        kRemoveList( &( pstProcess->stChildThreadList ), pstTask->stLink.qwID );
-                    
+                    if( pstProcess != NULL )
+                    {
+                        if( kFindSchedulerOfTaskAndLock( pstProcess->stLink.qwID, 
+                                &bProcessAPICID ) == TRUE )
+                        {
+                            kRemoveList( &( pstProcess->stChildThreadList ), 
+                                         pstTask->stLink.qwID );
+                            kUnlockForSpinLock( &( gs_vstScheduler[ 
+                                bProcessAPICID ].stSpinLock ) );
+                        }
+                    }
                 }
+                
                 qwTaskID = pstTask->stLink.qwID;
-                kFreeTCB( qwTaskID );
-                
-                kUnlockForSystemData( bPreviousFlag );
-                
+                kFreeTCB( qwTaskID );                
                 kPrintf( "IDLE: Task ID[0x%q] is completely ended.\n", qwTaskID );
             }
         }
@@ -775,51 +911,31 @@ void kIdleTask( void )
     }
 }
 
-/**
- *  function name : kHaltProcessorByLoad
- *  parameters    : void
- *  return value  : void
- *  brief         : halt cpu
- */
-void kHaltProcessorByLoad( void )
+void kHaltProcessorByLoad( BYTE bAPICID )
 {
-    if ( gs_stScheduler.qwProcessorLoad < 40 )
+    if( gs_vstScheduler[ bAPICID ].qwProcessorLoad < 40 )
     {
         kHlt();
         kHlt();
         kHlt();
     }
-    else if ( gs_stScheduler.qwProcessorLoad < 80 )
+    else if( gs_vstScheduler[ bAPICID ].qwProcessorLoad < 80 )
     {
         kHlt();
         kHlt();
     }
-    else if ( gs_stScheduler.qwProcessorLoad < 95 )
+    else if( gs_vstScheduler[ bAPICID ].qwProcessorLoad < 95 )
     {
         kHlt();
     }
 }
 
-// FPU
-
-/**
- *  function name : kGetLastFPUUsedTaskID
- *  parameters    : void
- *  return value  : QWORD
- *  brief         : return task id of using FPU last
- */
-QWORD kGetLastFPUUsedTaskID( void )
+QWORD kGetLastFPUUsedTaskID( BYTE bAPICID )
 {
-    return gs_stScheduler.qwLastFPUUsedTaskID;
+    return gs_vstScheduler[ bAPICID ].qwLastFPUUsedTaskID;
 }
 
-/**
- *  function name : kSetLastFPUUsedTaskID
- *  parameters    : qwTaskID(QWORD)
- *  return value  : void
- *  brief         : set FPU task id
- */
-void kSetLastFPUUsedTaskID( QWORD qwTaskID )
+void kSetLastFPUUsedTaskID( BYTE bAPICID, QWORD qwTaskID )
 {
-    gs_stScheduler.qwLastFPUUsedTaskID = qwTaskID;
+    gs_vstScheduler[ bAPICID ].qwLastFPUUsedTaskID = qwTaskID;
 }

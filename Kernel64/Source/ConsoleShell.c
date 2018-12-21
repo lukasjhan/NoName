@@ -1,6 +1,6 @@
 /* filename          /Kernel64/Source/ConsoleShell.c
  * date              2018.11.23
- * last edit date    2018.12.06
+ * last edit date    2018.12.18
  * author            NO.00[UNKNOWN]
  * brief             source code for shell
 */
@@ -18,6 +18,10 @@
 #include "HardDisk.h"
 #include "FileSystem.h"
 #include "SerialPort.h"
+#include "MPConfigurationTable.h"
+#include "MultiProcessor.h"
+#include "IOAPIC.h"
+#include "InterruptHandler.h"
 
 SHELLCOMMANDENTRY gs_vstCommandTable[] =
 {
@@ -58,6 +62,14 @@ SHELLCOMMANDENTRY gs_vstCommandTable[] =
         { "testperformance", "Test File Read/WritePerformance", kTestPerformance },
         { "flush", "Flush File System Cache", kFlushCache },
         { "download", "Download Data From Serial, ex) download a.txt", kDownloadFile },
+        { "showmpinfo", "Show MP Configuration Table Information", kShowMPConfigurationTable },
+        { "startap", "Start Application Processor", kStartApplicationProcessor },
+        { "startsymmetricio", "Start Symmetric I/O Mode", kStartSymmetricIOMode },
+        { "showirqintinmap", "Show IRQ->INITIN Mapping Table", kShowIRQINTINMappingTable },
+        { "showintproccount", "Show Interrupt Processing Count", kShowInterruptProcessingCount },
+        { "startintloadbal", "Start Interrupt Load Balancing", kStartInterruptLoadBalancing },
+        { "starttaskloadbal", "Start Task Load Balancing", kStartTaskLoadBalancing },
+        { "changeaffinity", "Change Task Affinity, ex)changeaffinity 1(ID) 0xFF(Affinity)", kChangeTaskAffinity },
 };                                     
 
 /**
@@ -485,7 +497,7 @@ static void kTestTask1( void )
     CHARACTER* pstScreen = ( CHARACTER* ) CONSOLE_VIDEOMEMORYADDRESS;
     TCB* pstRunningTask;
     
-    pstRunningTask = kGetRunningTask();
+    pstRunningTask = kGetRunningTask( kGetAPICID() );
     iMargin = ( pstRunningTask->stLink.qwID & 0xFFFFFFFF ) % 10;
     
     for( j = 0 ; j < 20000 ; j++ )
@@ -535,7 +547,7 @@ static void kTestTask2( void )
     TCB* pstRunningTask;
     char vcData[ 4 ] = { '-', '\\', '|', '/' };
     
-    pstRunningTask = kGetRunningTask();
+    pstRunningTask = kGetRunningTask( kGetAPICID() );
     iOffset = ( pstRunningTask->stLink.qwID & 0xFFFFFFFF ) * 2;
     iOffset = CONSOLE_WIDTH * CONSOLE_HEIGHT - ( iOffset % ( CONSOLE_WIDTH * CONSOLE_HEIGHT ) );
 
@@ -545,6 +557,32 @@ static void kTestTask2( void )
         pstScreen[ iOffset ].bAttribute = ( iOffset % 15 ) + 1;
         i++;
     
+        kSchedule();
+    }
+}
+
+static void kTestTask3( void )
+{
+    QWORD qwTaskID;
+    TCB* pstRunningTask;
+    BYTE bLastLocalAPICID;
+    QWORD qwLastTick;
+    
+    pstRunningTask = kGetRunningTask( kGetAPICID() );
+    qwTaskID = pstRunningTask->stLink.qwID;
+    kPrintf( "Test Task 3 Started. Task ID = 0x%q, Local APIC ID = 0x%x\n", qwTaskID, kGetAPICID() );
+    
+    bLastLocalAPICID = kGetAPICID();
+    
+    while( 1 )
+    {
+        if( bLastLocalAPICID != kGetAPICID() )
+        {
+            kPrintf( "Core Changed. Task ID = 0x%q, Previous Local APIC ID = 0x%x Current = 0x%x\n", qwTaskID, bLastLocalAPICID, kGetAPICID() );
+            
+            bLastLocalAPICID = kGetAPICID();
+        }
+        
         kSchedule();
     }
 }
@@ -571,7 +609,7 @@ static void kCreateTestTask( const char* pcParameterBuffer )
     case 1:
         for ( i = 0 ; i < kAToI( vcCount, 10 ) ; i++ )
         {    
-            if ( kCreateTask( TASK_FLAGS_LOW | TASK_FLAGS_THREAD, 0, 0, ( QWORD ) kTestTask1 ) == NULL )
+            if( kCreateTask( TASK_FLAGS_LOW | TASK_FLAGS_THREAD, 0, 0, ( QWORD ) kTestTask1, TASK_LOADBALANCINGID ) == NULL )
                 break;
         }
         
@@ -582,11 +620,23 @@ static void kCreateTestTask( const char* pcParameterBuffer )
     default:
         for ( i = 0 ; i < kAToI( vcCount, 10 ) ; i++ )
         {    
-            if ( kCreateTask( TASK_FLAGS_LOW | TASK_FLAGS_THREAD, 0, 0, ( QWORD ) kTestTask2 ) == NULL )
+            if( kCreateTask( TASK_FLAGS_LOW | TASK_FLAGS_THREAD, 0, 0, ( QWORD ) kTestTask2, TASK_LOADBALANCINGID ) == NULL )
                 break;
         }
         
         kPrintf( "Task2 %d Created\n", i );
+        break;
+
+    case 3:
+        for( i = 0 ; i < kAToI( vcCount, 10 ) ; i ++ )
+        {    
+            if( kCreateTask( TASK_FLAGS_LOW | TASK_FLAGS_THREAD, 0, 0, ( QWORD ) kTestTask3, TASK_LOADBALANCINGID ) == NULL )
+            {
+                break;
+            }
+            kSchedule();
+        }
+        kPrintf( "Task3 %d Created\n", i );
         break;
     }    
 }   
@@ -634,17 +684,57 @@ static void kShowTaskList( const char* pcParameterBuffer )
     int i;
     TCB* pstTCB;
     int iCount = 0;
+    int iTotalTaskCount = 0;
+    char vcBuffer[ 20 ];
+    int iRemainLength;
+    int iProcessorCount;
     
-    kPrintf( "=========== Task Total Count [%d] ===========\n", kGetTaskCount() );
-    for ( i = 0 ; i < TASK_MAXCOUNT ; i++ )
+    iProcessorCount = kGetProcessorCount(); 
+    
+    for( i = 0 ; i < iProcessorCount ; i++ )
+    {
+        iTotalTaskCount += kGetTaskCount( i );
+    }
+    
+    kPrintf( "================= Task Total Count [%d] =================\n", 
+             iTotalTaskCount );
+    
+    if( iProcessorCount > 1 )
+    {
+        for( i = 0 ; i < iProcessorCount ; i++ )
+        {
+            if( ( i != 0 ) && ( ( i % 4 ) == 0 ) )
+            {
+                kPrintf( "\n" );
+            }
+            
+            kSPrintf( vcBuffer, "Core %d : %d", i, kGetTaskCount( i ) );
+            kPrintf( vcBuffer );
+            
+            iRemainLength = 19 - kStrLen( vcBuffer );
+            kMemSet( vcBuffer, ' ', iRemainLength );
+            vcBuffer[ iRemainLength ] = '\0';
+            kPrintf( vcBuffer );
+        }
+        
+        kPrintf( "\nPress any key to continue... ('q' is exit) : " );
+        if( kGetCh() == 'q' )
+        {
+            kPrintf( "\n" );
+            return ;
+        }
+        kPrintf( "\n\n" );
+    }
+    
+    for( i = 0 ; i < TASK_MAXCOUNT ; i++ )
     {
         pstTCB = kGetTCBInTCBPool( i );
-        if ( ( pstTCB->stLink.qwID >> 32 ) != 0 )
+        if( ( pstTCB->stLink.qwID >> 32 ) != 0 )
         {
-            if ( ( iCount != 0 ) && ( ( iCount % 10 ) == 0 ) )
+            if( ( iCount != 0 ) && ( ( iCount % 6 ) == 0 ) )
             {
                 kPrintf( "Press any key to continue... ('q' is exit) : " );
-                if ( kGetCh() == 'q' )
+                if( kGetCh() == 'q' )
                 {
                     kPrintf( "\n" );
                     break;
@@ -652,8 +742,13 @@ static void kShowTaskList( const char* pcParameterBuffer )
                 kPrintf( "\n" );
             }
             
-            kPrintf( "[%d] Task ID[0x%Q], Priority[%d], Flags[0x%Q], Thread[%d]\n", 1 + iCount++, pstTCB->stLink.qwID, GETPRIORITY( pstTCB->qwFlags ), pstTCB->qwFlags, kGetListCount( &( pstTCB->stChildThreadList ) ) );
-            kPrintf( "    Parent PID[0x%Q], Memory Address[0x%Q], Size[0x%Q]\n", pstTCB->qwParentProcessID, pstTCB->pvMemoryAddress, pstTCB->qwMemorySize );
+            kPrintf( "[%d] Task ID[0x%Q], Priority[%d], Flags[0x%Q], Thread[%d]\n", 1 + iCount++,
+                     pstTCB->stLink.qwID, GETPRIORITY( pstTCB->qwFlags ), 
+                     pstTCB->qwFlags, kGetListCount( &( pstTCB->stChildThreadList ) ) );
+            kPrintf( "    Core ID[0x%X] CPU Affinity[0x%X]\n", pstTCB->bAPICID,
+                     pstTCB->bAffinity );
+            kPrintf( "    Parent PID[0x%Q], Memory Address[0x%Q], Size[0x%Q]\n",
+                    pstTCB->qwParentProcessID, pstTCB->pvMemoryAddress, pstTCB->qwMemorySize );
         }
     }
 }
@@ -724,7 +819,28 @@ static void kKillTask( const char* pcParameterBuffer )
  */
 static void kCPULoad( const char* pcParameterBuffer )
 {
-    kPrintf( "Processor Load : %d%%\n", kGetProcessorLoad() );
+    int i;
+    char vcBuffer[ 50 ];
+    int iRemainLength;
+    
+    kPrintf( "================= Processor Load =================\n" ); 
+    
+    for( i = 0 ; i < kGetProcessorCount() ; i++ )
+    {
+        if( ( i != 0 ) && ( ( i % 4 ) == 0 ) )
+        {
+            kPrintf( "\n" );
+        }
+        
+        kSPrintf( vcBuffer, "Core %d : %d%%", i, kGetProcessorLoad( i ) );
+        kPrintf( "%s", vcBuffer );
+        
+        iRemainLength = 19 - kStrLen( vcBuffer );
+        kMemSet( vcBuffer, ' ', iRemainLength );
+        vcBuffer[ iRemainLength ] = '\0';
+        kPrintf( vcBuffer );
+    }
+    kPrintf( "\n" );
 }
 
 // FOR MUTEX TEST!!
@@ -750,7 +866,7 @@ static void kPrintNumberTask( void )
     for ( i = 0 ; i < 5 ; i++ )
     {
         kLock( &( gs_stMutex ) );
-        kPrintf( "Task ID [0x%Q] Value[%d]\n", kGetRunningTask()->stLink.qwID, gs_qwAdder );
+        kPrintf( "Task ID [0x%Q] Value[%d]\n", kGetRunningTask( kGetAPICID() )->stLink.qwID, gs_qwAdder );
         
         gs_qwAdder += 1;
         kUnlock( & ( gs_stMutex ) );
@@ -782,7 +898,7 @@ static void kTestMutex( const char* pcParameterBuffer )
     kInitializeMutex( &gs_stMutex );
     
     for( i = 0 ; i < 3 ; i++ )
-        kCreateTask( TASK_FLAGS_LOW | TASK_FLAGS_THREAD, 0, 0, ( QWORD ) kPrintNumberTask );
+        kCreateTask( TASK_FLAGS_LOW | TASK_FLAGS_THREAD, 0, 0, ( QWORD ) kPrintNumberTask, kGetAPICID() );
         
     kPrintf( "Wait Util %d Task End...\n", i );
     kGetCh();
@@ -794,7 +910,7 @@ static void kCreateThreadTask( void )
     
     for( i = 0 ; i < 3 ; i++ )
     {
-        kCreateTask( TASK_FLAGS_LOW | TASK_FLAGS_THREAD, 0, 0, ( QWORD ) kTestTask2 );
+        kCreateTask( TASK_FLAGS_LOW | TASK_FLAGS_THREAD, 0, 0, ( QWORD ) kTestTask2, TASK_LOADBALANCINGID );
     }
     
     while( 1 )
@@ -811,7 +927,7 @@ static void kTestThread( const char* pcParameterBuffer )
     TCB* pstProcess;
     
     pstProcess = kCreateTask( TASK_FLAGS_LOW | TASK_FLAGS_PROCESS, ( void * )0xEEEEEEEE, 0x1000, 
-                              ( QWORD ) kCreateThreadTask );
+                              ( QWORD ) kCreateThreadTask, TASK_LOADBALANCINGID );
     if( pstProcess != NULL )
     {
         kPrintf( "Process [0x%Q] Create Success\n", pstProcess->stLink.qwID ); 
@@ -879,7 +995,7 @@ static void kMatrixProcess( void )
     
     for ( i = 0 ; i < 300 ; i++ )
     {
-        if ( kCreateTask( TASK_FLAGS_THREAD | TASK_FLAGS_LOW, 0, 0, ( QWORD ) kDropCharactorThread ) == NULL )
+        if( kCreateTask( TASK_FLAGS_THREAD | TASK_FLAGS_LOW, 0, 0, ( QWORD ) kDropCharactorThread, TASK_LOADBALANCINGID ) == NULL )
             break;
 
         kSleep( kRandom() % 5 + 5 );
@@ -896,7 +1012,8 @@ static void kShowMatrix( const char* pcParameterBuffer )
 {
     TCB* pstProcess;
     
-    pstProcess = kCreateTask( TASK_FLAGS_PROCESS | TASK_FLAGS_LOW, ( void* ) 0xE00000, 0xE00000, ( QWORD ) kMatrixProcess );
+    pstProcess = kCreateTask( TASK_FLAGS_PROCESS | TASK_FLAGS_LOW, ( void* ) 0xE00000, 0xE00000, 
+                              ( QWORD ) kMatrixProcess, TASK_LOADBALANCINGID );
     if ( pstProcess != NULL )
     {
         kPrintf( "Matrix Process [0x%Q] Create Success\n" );
@@ -923,7 +1040,7 @@ static void kFPUTestTask( void )
     char vcData[ 4 ] = { '-', '\\', '|', '/' };
     CHARACTER* pstScreen = ( CHARACTER* ) CONSOLE_VIDEOMEMORYADDRESS;
 
-    pstRunningTask = kGetRunningTask();
+    pstRunningTask = kGetRunningTask( kGetAPICID() );
 
     iOffset = ( pstRunningTask->stLink.qwID & 0xFFFFFFFF ) * 2;
     iOffset = CONSOLE_WIDTH * CONSOLE_HEIGHT - ( iOffset % ( CONSOLE_WIDTH * CONSOLE_HEIGHT ) );
@@ -973,7 +1090,7 @@ static void kTestPIE( const char* pcParameterBuffer )
     
     // create task
     for ( i = 0 ; i < 100 ; i++ )
-        kCreateTask( TASK_FLAGS_LOW | TASK_FLAGS_THREAD, 0, 0, ( QWORD ) kFPUTestTask );
+        kCreateTask( TASK_FLAGS_LOW | TASK_FLAGS_THREAD, 0, 0, ( QWORD ) kFPUTestTask, TASK_LOADBALANCINGID );
 }
 
 /**
@@ -1054,7 +1171,7 @@ static void kRandomAllocationTask( void )
     int i, j;
     int iY;
     
-    pstTask = kGetRunningTask();
+    pstTask = kGetRunningTask( kGetAPICID() );
     iY = ( pstTask->stLink.qwID ) % 15 + 9;
 
     for ( j = 0 ; j < 10 ; j++ )
@@ -1104,7 +1221,7 @@ static void kTestRandomAllocation( const char* pcParameterBuffer )
     int i;
     
     for ( i = 0 ; i < 1000 ; i++ )
-        kCreateTask( TASK_FLAGS_LOWEST | TASK_FLAGS_THREAD, 0, 0, ( QWORD ) kRandomAllocationTask );
+        kCreateTask( TASK_FLAGS_LOWEST | TASK_FLAGS_THREAD, 0, 0, ( QWORD ) kRandomAllocationTask, TASK_LOADBALANCINGID );
 }
 
 static void kShowHDDInformation( const char* pcParameterBuffer )
@@ -1996,4 +2113,204 @@ static void kDownloadFile( const char* pcParameterBuffer )
     
     fclose( fp );
     kFlushFileSystemCache();
+}
+
+static void kShowMPConfigurationTable( const char* pcParameterBuffer )
+{
+    kPrintMPConfigurationTable();
+}
+
+static void kStartApplicationProcessor( const char* pcParameterBuffer )
+{
+    if ( kStartUpApplicationProcessor() == FALSE )
+    {
+        kPrintf( "Application Processor Start Fail\n" );
+        return ;
+    }
+
+    kPrintf( "Application Processor Start Success\n" );
+    kPrintf( "Bootstrap Processor[APIC ID: %d] Start Application Processor\n", kGetAPICID() );
+}
+
+static void kStartSymmetricIOMode( const char* pcParameterBuffer )
+{
+    MPCONFIGRUATIONMANAGER* pstMPManager;
+    BOOL bInterruptFlag;
+
+    if( kAnalysisMPConfigurationTable() == FALSE )
+    {
+        kPrintf( "Analyze MP Configuration Table Fail\n" );
+        return ;
+    }
+
+    pstMPManager = kGetMPConfigurationManager();
+    if( pstMPManager->bUsePICMode == TRUE )
+    {
+        kOutPortByte( 0x22, 0x70 );
+        kOutPortByte( 0x23, 0x01 );
+    }
+
+    kPrintf( "Mask All PIC Controller Interrupt\n" );
+    kMaskPICInterrupt( 0xFFFF );
+
+    kPrintf( "Enable Global Local APIC\n" );
+    kEnableGlobalLocalAPIC();
+    
+    kPrintf( "Enable Software Local APIC\n" );
+    kEnableSoftwareLocalAPIC();
+
+    kPrintf( "Disable CPU Interrupt Flag\n" );
+    bInterruptFlag = kSetInterruptFlag( FALSE );
+    
+    kSetTaskPriority( 0 );
+
+    kInitializeLocalVectorTable();
+
+    kSetSymmetricIOMode( TRUE );
+    
+    kPrintf( "Initialize IO Redirection Table\n" );
+    kInitializeIORedirectionTable();
+        
+    kPrintf( "Restore CPU Interrupt Flag\n" );
+    kSetInterruptFlag( bInterruptFlag );
+        
+    kPrintf( "Change Symmetric I/O Mode Complete\n" );
+}
+
+static void kShowIRQINTINMappingTable( const char* pcParameterBuffer )
+{
+    kPrintIRQToINTINMap();
+}
+
+static void kShowInterruptProcessingCount( const char* pcParameterBuffer )
+{
+    INTERRUPTMANAGER* pstInterruptManager;
+    int i;
+    int j;
+    int iProcessCount;
+    char vcBuffer[ 20 ];
+    int iRemainLength;
+    int iLineCount;
+    
+    kPrintf( "========================== Interrupt Count ==========================\n" );
+    
+    iProcessCount = kGetProcessorCount();
+    
+    for( i = 0 ; i < iProcessCount ; i++ )
+    {
+        if( i == 0 )
+        {
+            kPrintf( "IRQ Num\t\t" );
+        }
+        else if( ( i % 4 ) == 0 )
+        {
+            kPrintf( "\n       \t\t" );
+        }
+        kSPrintf( vcBuffer, "Core %d", i );
+        kPrintf( vcBuffer );
+        
+        iRemainLength = 15 - kStrLen( vcBuffer );
+        kMemSet( vcBuffer, ' ', iRemainLength );
+        vcBuffer[ iRemainLength ] = '\0';
+        kPrintf( vcBuffer );
+    }
+    kPrintf( "\n" );
+
+    iLineCount = 0;
+    pstInterruptManager = kGetInterruptManager();
+    for( i = 0 ; i < INTERRUPT_MAXVECTORCOUNT ; i++ )
+    {
+        for( j = 0 ; j < iProcessCount ; j++ )
+        {
+            if( j == 0 )
+            {
+                if( ( iLineCount != 0 ) && ( iLineCount > 10 ) )
+                {
+                    kPrintf( "\nPress any key to continue... ('q' is exit) : " );
+                    if( kGetCh() == 'q' )
+                    {
+                        kPrintf( "\n" );
+                        return ;
+                    }
+                    iLineCount = 0;
+                    kPrintf( "\n" );
+                }
+                kPrintf( "---------------------------------------------------------------------\n" );
+                kPrintf( "IRQ %d\t\t", i );
+                iLineCount += 2;
+            }
+            else if( ( j % 4 ) == 0 )
+            {
+                kPrintf( "\n      \t\t" );
+                iLineCount++;
+            }
+            
+            kSPrintf( vcBuffer, "0x%Q", pstInterruptManager->vvqwCoreInterruptCount[ j ][ i ] );
+            kPrintf( vcBuffer );
+            iRemainLength = 15 - kStrLen( vcBuffer );
+            kMemSet( vcBuffer, ' ', iRemainLength );
+            vcBuffer[ iRemainLength ] = '\0';
+            kPrintf( vcBuffer );
+        }
+        kPrintf( "\n" );
+    }
+}
+
+static void kStartInterruptLoadBalancing( const char* pcParameterBuffer )
+{
+    kPrintf( "Start Interrupt Load Balancing\n" );
+    kSetInterruptLoadBalancing( TRUE );
+}
+
+static void kStartTaskLoadBalancing( const char* pcParameterBuffer )
+{
+    int i;
+    
+    kPrintf( "Start Task Load Balancing\n" );
+    
+    for( i = 0 ; i < MAXPROCESSORCOUNT ; i++ )
+    {
+        kSetTaskLoadBalancing( i, TRUE );
+    }
+}
+
+static void kChangeTaskAffinity( const char* pcParameterBuffer )
+{
+    PARAMETERLIST stList;
+    char vcID[ 30 ];
+    char vcAffinity[ 30 ];
+    QWORD qwID;
+    BYTE bAffinity;
+    
+    kInitializeParameter( &stList, pcParameterBuffer );
+    kGetNextParameter( &stList, vcID );
+    kGetNextParameter( &stList, vcAffinity );
+    
+    if( kMemCmp( vcID, "0x", 2 ) == 0 )
+    {
+        qwID = kAToI( vcID + 2, 16 );
+    }
+    else
+    {
+        qwID = kAToI( vcID, 10 );
+    }
+    
+    if( kMemCmp( vcID, "0x", 2 ) == 0 )
+    {
+        bAffinity = kAToI( vcAffinity + 2, 16 );
+    }
+    else
+    {
+        bAffinity = kAToI( vcAffinity, 10 );
+    }
+    
+    kPrintf( "Change Task Affinity ID [0x%q] Affinity[0x%x] ", qwID, bAffinity );
+    if( kChangeProcessorAffinity( qwID, bAffinity ) == TRUE )
+    {
+        kPrintf( "Success\n" );
+    }
+    else
+    {
+        kPrintf( "Fail\n" );
+    }
 }
