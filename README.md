@@ -1,6 +1,6 @@
 # NoName
 
-OS for x86-64 system
+x86-64 OS system for studying
 
 # Directory Description
 
@@ -9,8 +9,6 @@ OS for x86-64 system
 * /Kernel64   : 64bit Kernel - Working
 
 # Feature
-
-## DONE
 
 * BootLoader
 * interrupt
@@ -27,13 +25,7 @@ OS for x86-64 system
 * cache & ram disk
 * multi-core
 * symentic I/O mode
-
-## Working
-
-
-
-## TO-DO
-
 * GUI & mouse driver
 * system call
-* user level
+* user level programs
+* USB booting
